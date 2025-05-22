@@ -1,0 +1,42 @@
+// Grammar for parsing lambda expressions, definitions and comments.
+
+// A source is some optional whitespace, followed by zero or more statements, followed by the end of the file ("$").
+SOURCE := WHITESPACE* statements=STMT* $
+
+// A statement is is either a definition or an expression, followed by optional whitespace.
+STMT := stmt={DEF | EXPR} WHITESPACE*
+
+// A definition is an identifier followed by an equals sign followed by an expression.
+// The equals sign has optional spaces around it.
+DEF := identifier=IDENT ' '* '=' ' '* value=EXPR
+
+// A lambda expression is either an application or a term.
+// By making the application a top-level expression, we avoid left-recursion.
+EXPR := APPLICATION | TERM
+
+// A term is either a lambda abstraction, an identifier, or a group.
+TERM := ABSTRACTION | IDENT | GROUP
+
+// A lambda abstraction is a lambda symbol followed by an identifier, a dot, optional spacing, and an expression.
+ABSTRACTION := 'λ' parameter=IDENT '\.' ' '* body=EXPR
+
+// A lambda application is a function followed by an argument, separated by any number of spaces.
+// For example, when one of the expressions is a group then no space is neccessary.
+// For example, when both expressions are identifiers and no space is present, then they are effectively one identifier.
+APPLICATION := func=EXPR ' '* arg=TERM
+
+// A group is any expression wrapped in parentheses.
+GROUP := '\(' group=EXPR '\)'
+
+// An identifier is a sequence of letters, digits, and underscores.
+IDENT := identifier='[a-zA-Z0-9_]+'
+
+// Whitespace is either a comment or a space.
+WHITESPACE := COMMENT | '\s'
+
+// A comment is a '#' followed by anything until the end of the line.
+COMMENT := '#' '.'* EOL
+
+// The end of a line is either a newline or the end of the file (EOF, represented by "$").
+// The '&' is used to not "consume" the EOF since it is consumed by the START rule.
+EOL := '\n' | &$

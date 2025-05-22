@@ -208,9 +208,7 @@ export default function App() {
     }
 
     // Update AST
-    console.log("PARSING", source);
     const newAst = parseSource(source);
-    console.log("New AST:", newAst);
     // Update AST or exprError
     if (newAst === undefined || newAst.errs !== undefined) {
       exprError.value = true;

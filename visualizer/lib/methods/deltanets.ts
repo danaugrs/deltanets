@@ -221,11 +221,6 @@ function getRedexesAndState(
     }
   }
 
-  console.log("eraserActivePairs", eraserActivePairs);
-  console.log("fanFanAnnihilations", fanFanAnnihilations);
-  console.log("repRepAnnihilations", repRepAnnihilations);
-  console.log("fanDecays", fanDecays);
-  console.log("repDecays", repDecays);
   if (fanDecays || repDecays || eraserActivePairs || fanFanAnnihilations || repRepAnnihilations) {
     reductionState = ReductionState.Deletions;
   }
@@ -384,7 +379,6 @@ function getRedexesAndState(
     reductionState = ReductionState.ReplicatorCanonicalizations;
   }
 
-  console.log("Reduction State: ", reductionState);
   return { reductionState, redexes };
 }
 
@@ -535,9 +529,7 @@ function render(
 
   // Get optimal redexes
   const optimalRedexes = redexes.filter((redex) => redex.optimal);
-  console.log("Optimal redexes: ", optimalRedexes);
   if (optimalRedexes.length > 0) {
-
     // If forward is undefined, set it to reduce a random redex
     if (currState.forward === undefined) {
       currState.forward = () => {
@@ -546,12 +538,10 @@ function render(
         });
       };
     }
-
     // Set forwardParallel
     currState.forwardParallel = () => {
       applyReduction(state, () => {
         optimalRedexes.forEach((redex) => {
-          console.log("Redex: ", redex);
           redex.reduce();
         });
       });
@@ -1010,8 +1000,6 @@ const renderWires = (node2D: Node2D, endpoints: Endpoint[], state: Signal<Method
     // TODO: show level even if one side? Would sill need to fix levels out of eraser "roots". And if those are fixed, then probably don't need this.
     // Set level. Pick the non-undefined level if it exists. if both are defined, then make sure they are equal
     // const level = endpoints[i].level === undefined ? endpoints[j].level : endpoints[j].level === undefined ? endpoints[i].level : endpoints[i].level// (endpoints[i].level === endpoints[j].level) ? endpoints[i].level : undefined;
-
-    console.log("wire redex",redex);
 
     const wire = new Wire(
       endpoints[i].node2D,

@@ -42,8 +42,8 @@ export function Graph(
 
     // Move group
     const move = (e: any) => {
-      center.value = false;
       if (state.value === "pan") {
+        center.value = false;
         if (e.type === "mousemove") {
           translate.value = {
             x: translate.value.x + (e.clientX - lastPos.value.x) / scale.value,

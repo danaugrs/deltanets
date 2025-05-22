@@ -599,7 +599,7 @@ export default function App() {
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
         }}
-        href="https://github.com/danaugrs/lambda-vis"
+        href="https://github.com/danaugrs/deltanets"
         target={"_blank"}
         rel="noopener noreferrer"
       >

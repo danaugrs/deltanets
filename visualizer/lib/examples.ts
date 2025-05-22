@@ -3,7 +3,7 @@ const examples = [
     name: "Starter",
     code: `# Reduce the net by clicking on highlighted node pairs (green = optimal), using the arrow keys on your keyboard, or clicking the buttons in the toolbar.
 
-# Use backslash ("\") to insert a "λ".
+# Use backslash ("\\") to insert a "λ".
 # Give a name to a lambda term with "=".
 # For example:
 

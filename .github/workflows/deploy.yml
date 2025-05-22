@@ -30,7 +30,7 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: "deltanets"
-          entrypoint: "main.ts"
-          root: "."
+          entrypoint: "visualizer/main.ts"
+          root: "visualizer"
           
           

@@ -62,7 +62,7 @@ export default function App() {
 
   const storedEditorWidth = IS_BROWSER &&
     window.localStorage.getItem("editorWidth");
-  const editorWidth = useSignal<number>(parseFloat(storedEditorWidth || "300"));
+  const editorWidth = useSignal<number>(parseFloat(storedEditorWidth || "500"));
 
   // AST
   const ast = useSignal<AstNode | null>(null);

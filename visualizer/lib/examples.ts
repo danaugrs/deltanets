@@ -69,7 +69,7 @@ C2 = λc1.λc2.c2
 # ColorEq returns T if two colors are equal, and F otherwise
 ColorEq = λa.λb.a (b T F) (b F T)
 
-# Colorable returns T if a function f returns T for any of the three colors, and F otherwise
+# Colorable returns T if a function f returns T for any of the two colors, and F otherwise
 Colorable = λf.Or (f C1) (f C2)
 
 # A 2-colorable graph with 2 nodes

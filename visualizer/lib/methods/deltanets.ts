@@ -68,15 +68,6 @@ function init(ast: AstNode): State {
   };
 }
 
-// The possible states of the reduction process, each of which determines which reductions can be applied
-enum ReductionState {
-  Deletions = "Deletions",
-  Commutations = "Commutations",
-  Expansions = "Expansions",
-  ReplicatorCanonicalizations = "ReplicatorCanonicalizations",
-  Done = "Done",
-}
-
 // Returns the redex that contains the pair of nodes (a, b) if it exists, or undefined otherwise.
 function getRedex(a: Node, b: Node, redexes: Redex[]): Redex | undefined {
   for (const redex of redexes) {
@@ -91,10 +82,7 @@ function getRedex(a: Node, b: Node, redexes: Redex[]): Redex | undefined {
 type Redex = { a: Node; b: Node; optimal: boolean; reduce: () => void };
 
 // Returns all the redexes (core interactions and canonicalizations) and the current reduction state.
-function getRedexesAndState(
-  graph: Graph,
-): { reductionState: ReductionState; redexes: Redex[] } {
-  let reductionState: ReductionState = ReductionState.Done;
+function getRedexes(graph: Graph): Redex[] {
   const redexes: Redex[] = [];
 
   const createRedex = (a: Node, b: Node, optimal: boolean, reduce: () => void) => {
@@ -158,8 +146,6 @@ function getRedexesAndState(
     }
   }
 
-  const decaysOptimal = !fanFanAnnihilations && !repRepAnnihilations;
-
   // Check for fan decay
   let fanDecays = false;
   for (const node of graph) {
@@ -169,7 +155,7 @@ function getRedexesAndState(
       node.ports[1].node.type === "era"
     ) {
       fanDecays = true;
-      createRedex(node, node.ports[1].node, decaysOptimal, () => reduceAuxFan(node, graph));
+      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
     }
   }
 
@@ -190,7 +176,7 @@ function getRedexesAndState(
             return;
           }
           // Create a redex to eliminate the replicator aux port and eraser (and replicator if it only has one aux port)
-          createRedex(node, p.node, decaysOptimal || node.ports[0].port !== 0 || node.ports[0].node.type === "var", () => {
+          createRedex(node, p.node, !repRepAnnihilations || node.ports[0].port !== 0 || node.ports[0].node.type === "var", () => {
             // Get the index of the aux port to remove
             const portIndex = node.ports.indexOf(p);
 
@@ -221,91 +207,8 @@ function getRedexesAndState(
     }
   }
 
-  if (fanDecays || repDecays || eraserActivePairs || fanFanAnnihilations || repRepAnnihilations) {
-    reductionState = ReductionState.Deletions;
-  }
-
-  // Check for commutations (fan-rep, rep-rep)
-  const commutationsOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
-  let commutations = false;
-  for (const node of graph) {
-    if (node.ports[0].port === 0) {
-      // Active pair
-      if (
-        ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
-          node.ports[0].node.type === "app")))
-      ) {
-        // Fan-Rep commutation
-        commutations = true;
-        const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
-        const level = parseRepLabel(rep.label!).level;
-        createRedex(node, node.ports[0].node, commutationsOptimal, () => {
-          const { nodeClones } = reduceCommute(rep, graph);
-          nodeClones[0].label = formatRepLabel(level, "unknown");
-          nodeClones[1].label = formatRepLabel(level, "unknown");
-          nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
-        });
-      } else if (
-        node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
-      ) {
-        // Rep-Rep commutation
-        const a = node;
-        const b = node.ports[0].node;
-        commutations = true;
-        const { level: top, status: topFlag } = parseRepLabel(a.label!);
-        const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
-        if (top === bottom) {
-          createRedex(a, b, true, () => reduceAnnihilate(b, graph));
-        } else {
-          createRedex(a, b, commutationsOptimal, () => {
-            const { nodeClones, otherClones } = reduceCommute(b, graph);
-            if (top > bottom) {
-              // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
-              otherClones.forEach((node, i) => {
-                node.label = formatRepLabel(
-                  top + b.levelDeltas![i],
-                  topFlag,
-                );
-              });
-            } else {
-              // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
-              nodeClones.forEach((node, i) => {
-                node.label = formatRepLabel(
-                  bottom + a.levelDeltas![i],
-                  bottomFlag,
-                );
-              });
-            }
-          });
-        }
-      }
-    }
-  }
-
-  if (commutations && commutationsOptimal) {
-    reductionState = ReductionState.Commutations;
-  }
-
-  // Check for aux fan replication
-  const auxFanReplicationOptimal = !commutations && commutationsOptimal;
-  let auxFanReplications = false;
-  for (const node of graph) {
-    if (
-      (node.type === "abs" || node.type === "app") &&
-      node.ports[1].node.type.startsWith("rep") &&
-      node.ports[1].port === 0
-    ) {
-      auxFanReplications = true;
-      createRedex(node, node.ports[1].node, auxFanReplicationOptimal, () => reduceAuxFan(node, graph));
-    }
-  }
-
-  if (auxFanReplications && auxFanReplicationOptimal) {
-    reductionState = ReductionState.Expansions;
-  }
-
   // Check for unpaired replicator mergings and decays
-  const replicatorCanonicalizationOptimal = !auxFanReplications && auxFanReplicationOptimal;
+  const replicatorCanonicalizationOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
   let replicatorCanonicalizations = false;
   for (const node of graph) {
     // Find pairs of consecutive replicators where the first one is unpaired
@@ -336,8 +239,12 @@ function getRedexesAndState(
 
       if (secondUnpaired) {
         replicatorCanonicalizations = true;
+        (firstReplicator as any).isToBeMerged = true;
         // Merge the two replicators
-        createRedex(firstReplicator, secondReplicator, replicatorCanonicalizationOptimal || firstReplicator.ports[0].port !== 0 || firstReplicator.ports[0].node.type === "var", () => {
+        createRedex(firstReplicator, secondReplicator, replicatorCanonicalizationOptimal, () => {
+          // Reset isToBeMerged flag
+          (firstReplicator as any).isToBeMerged = false;
+
           firstReplicator.ports.splice(secondReplicatorPort, 1, ...secondReplicator.ports.slice(1));
           firstReplicator.levelDeltas!.splice(secondReplicatorPort - 1, 1, ...secondReplicator.levelDeltas!.map((ld) => ld + levelDeltaBetween));
 
@@ -375,11 +282,78 @@ function getRedexesAndState(
     }
   }
 
-  if (replicatorCanonicalizations && replicatorCanonicalizationOptimal) {
-    reductionState = ReductionState.ReplicatorCanonicalizations;
+  // Check for commutations (fan-rep, rep-rep)
+  const commutationsOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
+  let commutations = false;
+  for (const node of graph) {
+    if (node.ports[0].port === 0) {
+      // Active pair
+      if (
+        ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
+          node.ports[0].node.type === "app")))
+      ) {
+        // Fan-Rep commutation
+        commutations = true;
+        const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
+        const level = parseRepLabel(rep.label!).level;
+        createRedex(node, node.ports[0].node, commutationsOptimal && !(node as any).isToBeMerged, () => {
+          const { nodeClones } = reduceCommute(rep, graph);
+          nodeClones[0].label = formatRepLabel(level, "unknown");
+          nodeClones[1].label = formatRepLabel(level, "unknown");
+          nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
+        });
+      } else if (
+        node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
+      ) {
+        // Rep-Rep commutation
+        const a = node;
+        const b = node.ports[0].node;
+        commutations = true;
+        const { level: top, status: topFlag } = parseRepLabel(a.label!);
+        const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
+        if (top === bottom) {
+          createRedex(a, b, true, () => reduceAnnihilate(b, graph));
+        } else {
+          createRedex(a, b, commutationsOptimal && !(node as any).isToBeMerged, () => {
+            const { nodeClones, otherClones } = reduceCommute(b, graph);
+            if (top > bottom) {
+              // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
+              otherClones.forEach((node, i) => {
+                node.label = formatRepLabel(
+                  top + b.levelDeltas![i],
+                  topFlag,
+                );
+              });
+            } else {
+              // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
+              nodeClones.forEach((node, i) => {
+                node.label = formatRepLabel(
+                  bottom + a.levelDeltas![i],
+                  bottomFlag,
+                );
+              });
+            }
+          });
+        }
+      }
+    }
   }
 
-  return { reductionState, redexes };
+  // Check for aux fan replication
+  const auxFanReplicationOptimal = !commutations && commutationsOptimal;
+  let auxFanReplications = false;
+  for (const node of graph) {
+    if (
+      (node.type === "abs" || node.type === "app") &&
+      node.ports[1].node.type.startsWith("rep") &&
+      node.ports[1].port === 0
+    ) {
+      auxFanReplications = true;
+      createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph));
+    }
+  }
+
+  return redexes;
 }
 
 // Returns true if the node is connected to erasers on all its aux ports
@@ -415,7 +389,7 @@ function render(
   graph.forEach((node) => (node.isCreated = false));
 
   // Get redexes
-  const { redexes } = getRedexesAndState(graph);
+  const redexes = getRedexes(graph);
 
   // Render graph
   const rootNode = graph.find((node) => node.type === "root")!;

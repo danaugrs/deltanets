@@ -1,5 +1,5 @@
 import { batch, Signal, signal } from "@preact/signals";
-import { AstNode } from "../ast.ts";
+import { AstNode, SystemType } from "../ast.ts";
 import {
   D,
   Eraser,
@@ -16,7 +16,6 @@ import { Method, MethodState } from "./index.ts";
 // Δ-Nets (absolute indexes)
 const method: Method<Graph> = {
   name: "Δ-Nets (2025)",
-  group: "optimal",
   state: signal(null),
   init,
   render,
@@ -25,11 +24,11 @@ export default method;
 
 type State = MethodState<Graph>;
 
-function init(ast: AstNode): State {
+function init(ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean): State {
   const graph: Graph = [];
 
   // Build graph
-  const rootPort = addAstNodeToGraph(ast, graph);
+  const rootPort = addAstNodeToGraph(ast, graph, new Map(), 0, singleAgent, relativeLevel);
 
   // Add root node
   const rootNode: Node = { type: "root", label: "root", ports: [rootPort] };
@@ -82,7 +81,7 @@ function getRedex(a: Node, b: Node, redexes: Redex[]): Redex | undefined {
 type Redex = { a: Node; b: Node; optimal: boolean; reduce: () => void };
 
 // Returns all the redexes (core interactions and canonicalizations) and the current reduction state.
-function getRedexes(graph: Graph): Redex[] {
+function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean): Redex[] {
   const redexes: Redex[] = [];
 
   const createRedex = (a: Node, b: Node, optimal: boolean, reduce: () => void) => {
@@ -299,7 +298,7 @@ function getRedexes(graph: Graph): Redex[] {
         createRedex(node, node.ports[0].node, commutationsOptimal && !(node as any).isToBeMerged, () => {
           const { nodeClones } = reduceCommute(rep, graph);
           nodeClones[0].label = formatRepLabel(level, "unknown");
-          nodeClones[1].label = formatRepLabel(level, "unknown");
+          nodeClones[1].label = formatRepLabel(relativeLevel ? level + 1 :level, "unknown");
           nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
         });
       } else if (
@@ -349,7 +348,7 @@ function getRedexes(graph: Graph): Redex[] {
       node.ports[1].port === 0
     ) {
       auxFanReplications = true;
-      createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph));
+      createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph, relativeLevel));
     }
   }
 
@@ -379,7 +378,10 @@ const countAuxErasers = (node: Node) => {
 // Renders the current state of the reduction process
 function render(
   state: Signal<State>,
-  expression: Signal<string>, // TODO: remove this? if so also from lambdacalc.ts.
+  expression: Signal<string>,
+  systemType: SystemType,
+  singleAgent: boolean,
+  relativeLevel: boolean,
 ): Node2D {
   const currState = state.peek()!;
   const graph = currState.stack[currState.idx];
@@ -389,7 +391,7 @@ function render(
   graph.forEach((node) => (node.isCreated = false));
 
   // Get redexes
-  const redexes = getRedexes(graph);
+  const redexes = getRedexes(graph, systemType, relativeLevel);
 
   // Render graph
   const rootNode = graph.find((node) => node.type === "root")!;
@@ -1025,6 +1027,8 @@ function addAstNodeToGraph(
     { level: number; nodePort: NodePort; firstUsageLevel?: number }
   > = new Map(),
   level: number = 0,
+  singleAgent: boolean,
+  relativeLevel: boolean,
 ): NodePort {
   if (astNode.type === "abs") {
     // Create abstraction node with eraser
@@ -1039,7 +1043,7 @@ function addAstNodeToGraph(
     vars.set(astNode.name, { level, nodePort: { node, port: 2 } });
 
     // Parse body port
-    const bodyPort = addAstNodeToGraph(astNode.body, graph, vars, level);
+    const bodyPort = addAstNodeToGraph(astNode.body, graph, vars, level, singleAgent, relativeLevel);
     link(bodyPort, { node, port: 1 });
 
     // Need to restore original vars (if any) instead of deleting
@@ -1056,11 +1060,11 @@ function addAstNodeToGraph(
     graph.push(node);
 
     // Parse function port
-    const funcPort = addAstNodeToGraph(astNode.func, graph, vars, level);
+    const funcPort = addAstNodeToGraph(astNode.func, graph, vars, level, singleAgent, relativeLevel);
     link(funcPort, { node, port: 0 });
 
     // Parse argument port
-    const argPort = addAstNodeToGraph(astNode.arg, graph, vars, level + 1);
+    const argPort = addAstNodeToGraph(astNode.arg, graph, vars, level + 1, singleAgent, relativeLevel);
     link(argPort, { node, port: 2 });
 
     // Return parent port
@@ -1079,7 +1083,7 @@ function addAstNodeToGraph(
         // Create a replicator fan-in
         const node: Node = {
           type: "rep-in",
-          label: (varData.level + 1).toString(),
+          label: relativeLevel ? "0" : (varData.level + 1).toString(),
           ports: [],
           levelDeltas: [level - (varData.level + 1)],
         };
@@ -1264,7 +1268,7 @@ export function link(
 }
 
 // Reduces a fan and the node connected to its first auxiliary port (parent port).
-const reduceAuxFan = (node: Node, graph: Graph) => {
+const reduceAuxFan = (node: Node, graph: Graph, relativeLevel: boolean) => {
   const firstAuxNode = node.ports[1].node;
 
   if (firstAuxNode.type === "era") {
@@ -1287,7 +1291,12 @@ const reduceAuxFan = (node: Node, graph: Graph) => {
     link({ node, port: 1 }, origPorts[2]);
     link({ node, port: 2 }, origPorts[0]);
 
-    const { nodeClones } = reduceCommute(node, graph);
+    const { nodeClones, otherClones } = reduceCommute(node, graph);
+
+    if (relativeLevel) {
+      const repLevel = parseRepLabel(otherClones[1].label!).level;
+      otherClones[0].label = formatRepLabel(repLevel + 1, "unknown");
+    }
 
     // Modify all clones of the application node back to the original port configuration
     nodeClones.forEach((nodeClone) => {

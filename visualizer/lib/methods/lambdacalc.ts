@@ -7,6 +7,7 @@ import {
   freeVars,
   replace,
   substitute,
+  SystemType,
 } from "../ast.ts";
 import * as d3 from "d3";
 import { Edge, Enclosure, Label, Node2D, Pos } from "../render.ts";
@@ -19,7 +20,6 @@ import { prettifyExpr } from "../util.ts";
 const method: Method<AstNode> = {
   // The original lambda calculus introduced by Church was the 'relevant' lambda calculus which doesn't allow for weakening/erasure. This is why I add the '+' below to indicate that the lambda calculus started at 1936 but was extended afterwards.
   name: "λ-Calculus (1936+)",
-  group: "suboptimal",
   state: signal(null),
   init,
   render,
@@ -30,14 +30,21 @@ export default method;
 type State = MethodState<AstNode>;
 
 // Initialize the state by copying the initial AST.
-function init(ast: AstNode): State {
+// Ignores configuration options - they are hidden in the UI.
+function init(ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean): State {
   return { idx: 0, stack: [clone(ast)] };
 }
 
 // Render the AST as a tree but with enclosures around abstractions.
 // These enclosures connect each abstraction with all of its bound variables.
 // Reduction callbacks update the internal AST.
-function render(state: Signal<State>, expression: Signal<string>): Node2D {
+function render(
+  state: Signal<State>,
+  expression: Signal<string>,
+  systemType: SystemType,
+  singleAgent: boolean,
+  relativeLevel: boolean,
+): Node2D {
   const currState = state.peek()!;
   const tree = renderAstNode(state, expression, currState.stack[currState.idx]);
 

@@ -1,16 +1,9 @@
-import { AstNode } from "../ast.ts";
+import { AstNode, SystemType } from "../ast.ts";
 import { Node2D } from "../render.ts";
 import { Signal } from "@preact/signals";
 
 import lambdacalc from "./lambdacalc.ts";
 import deltanets from "./deltanets.ts";
-
-// Method groups
-export const METHOD_GROUPS = {
-  optimal: "Optimal",
-  betaoptimal: "β-Optimal",
-  suboptimal: "Suboptimal",
-} as const;
 
 // Export all methods
 export const METHODS: Record<string, Method<any>> = {
@@ -21,14 +14,15 @@ export const METHODS: Record<string, Method<any>> = {
 // Method type
 export type Method<Elem> = {
   name: string;
-  init: (ast: AstNode) => MethodState<Elem>;
+  init: (ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean) => MethodState<Elem>;
   render: (
     state: Signal<MethodState<Elem>>,
     expression: Signal<string>,
+    systemType: SystemType,
+    singleAgent: boolean,
+    relativeLevel: boolean,
   ) => Node2D;
   state: Signal<MethodState<Elem> | null>;
-  // Methods without a group are "tests" and are only shown in the dropdown menu when debug mode is enabled
-  group?:keyof typeof METHOD_GROUPS;
 };
 
 // Method state type

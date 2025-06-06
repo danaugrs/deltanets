@@ -235,7 +235,7 @@ export default function App() {
     }
     batch(() =>
       Object.keys(METHODS).forEach((m) => {
-        METHODS[m].state.value = METHODS[m].init(astValue);
+        METHODS[m].state.value = METHODS[m].init(astValue, systemType.value, singleAgent.value, relativeLevel.value);
       })
     );
   };
@@ -272,6 +272,9 @@ export default function App() {
     const node2D = currentMethod.render(
       currentState as Signal<MethodState<any>>,
       lastExpression,
+      systemType.value,
+      singleAgent.value,
+      relativeLevel.value,
     );
     scene.value = node2D;
   });
@@ -485,7 +488,7 @@ export default function App() {
       {method.value === "deltanets" && <select
         value={singleAgent.value ? "default" : "single"}
         onChange={(e) => {
-          const newSingleAgent = (e?.target as HTMLSelectElement).value === "a";
+          const newSingleAgent = (e?.target as HTMLSelectElement).value === "single";
           singleAgent.value = newSingleAgent;
         }}
         class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
@@ -499,7 +502,7 @@ export default function App() {
       {method.value === "deltanets" && <select
         value={relativeLevel.value ? "relative" : "absolute"}
         onChange={(e) => {
-          const newRelativeLevel = (e?.target as HTMLSelectElement).value === "a";
+          const newRelativeLevel = (e?.target as HTMLSelectElement).value === "relative";
           relativeLevel.value = newRelativeLevel;
         }}
         class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"

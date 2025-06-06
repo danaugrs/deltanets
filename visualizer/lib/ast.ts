@@ -320,3 +320,53 @@ export const astToString = (astNode: AstNode): string => {
     return fancyNameToName(astNode.name);
   }
 };
+
+export type SystemType = "linear" | "affine" | "relevant" | "full";
+
+export const getExpressionType = (astNode: AstNode): SystemType => {
+  let sharing = false;
+  let erasure = false;
+
+  const visit = (node: AstNode, boundVars: Map<string, number> = new Map()) => {
+    if (node.type === "abs") {
+      boundVars.set(node.name, 0);
+      visit(node.body, boundVars);
+      const count = boundVars.get(node.name);
+      if (count !== undefined) {
+        if (count === 0) {
+          erasure = true;
+        } else if (count > 1) {
+          sharing = true;
+        }
+      }
+    } else if (node.type === "app") {
+      visit(node.func, boundVars);
+      visit(node.arg, boundVars);
+    } else /* if (node.type === "var") */ {
+      const count = boundVars.get(node.name);
+      if (count !== undefined) {
+        const newCount = count + 1;
+        boundVars.set(node.name, newCount);
+        if (newCount > 1) {
+          sharing = true;
+        }
+      }
+    }
+  };
+  visit(astNode, new Map());
+
+  console.debug(sharing, erasure);
+  if (sharing) {
+    if (erasure) {
+      return "full";
+    } else {
+      return "relevant";
+    }
+  } else {
+    if (erasure) {
+      return "affine";
+    } else {
+      return "linear";
+    }
+  }
+};

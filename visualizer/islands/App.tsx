@@ -1,7 +1,7 @@
 import { batch, Signal, useSignal, useSignalEffect } from "@preact/signals";
 import { Graph as LambdaGraph } from "./Graph.tsx";
 import { Head, IS_BROWSER } from "$fresh/runtime.ts";
-import { AstNode, parseSource } from "../lib/ast.ts";
+import { AstNode, getExpressionType, parseSource, SystemType } from "../lib/ast.ts";
 import IconArrowBarToLeft from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/arrow-bar-to-left.tsx";
 import IconArrowLeft from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/arrow-left.tsx";
 import IconArrowRight from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/arrow-right.tsx";
@@ -53,7 +53,7 @@ export default function App() {
   // Reduction method
   const storedMethod = IS_BROWSER && window.localStorage.getItem("method");
   const method = useSignal<string>(storedMethod || Object.keys(METHODS)[0]);
-  const subMethod = useSignal<"l" | "a" | "i" | "k">("k");
+  const subMethod = useSignal<SystemType>("full");
 
   // Theme
   const storedTheme = IS_BROWSER && window.localStorage.getItem("theme");
@@ -219,6 +219,7 @@ export default function App() {
       batch(() => {
         exprError.value = false;
         ast.value = newAst.ast ?? null;
+        subMethod.value = getExpressionType(ast.value!);
       });
     }
   };
@@ -431,10 +432,10 @@ export default function App() {
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
           background: theme.value === "light" ? "white" : "#1A1A1A",
         }}>
-        <option value="l">Linear (L)</option>
-        <option value="a">Affine (A)</option>
-        <option value="i">Relevant (I)</option>
-        <option value="k">Full (K)</option>
+        <option value="linear">Linear (L)</option>
+        <option value="affine">Affine (A)</option>
+        <option value="relevant">Relevant (I)</option>
+        <option value="full">Full (K)</option>
       </select>
       {method.value === "deltanets" && <select
         class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"

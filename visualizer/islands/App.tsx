@@ -53,6 +53,7 @@ export default function App() {
   // Reduction method
   const storedMethod = IS_BROWSER && window.localStorage.getItem("method");
   const method = useSignal<string>(storedMethod || Object.keys(METHODS)[0]);
+  const subMethod = useSignal<"l" | "a" | "i" | "k">("k");
 
   // Theme
   const storedTheme = IS_BROWSER && window.localStorage.getItem("theme");
@@ -395,7 +396,7 @@ export default function App() {
           e.stopPropagation();
         }}
         value={method.value}
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit flex-1 min-w-[300px]"
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit flex-1"
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
           background: theme.value === "light" ? "white" : "#1A1A1A",
@@ -407,6 +408,52 @@ export default function App() {
           </option>
         ))}
       </select>
+      <select
+        // This select is just an indicator in the lambda calculus method
+        disabled={method.value === "lambdacalc"}
+        onChange={(e) => {
+          // const newMethod = (e?.target as HTMLSelectElement).value;
+          // window.localStorage.setItem("method", newMethod);
+          // batch(() => {
+          //   method.value = newMethod;
+          //   // Set isFirstLoad to true to force centering when method changes
+          //   isFirstLoad.value = true;
+          // });
+        }}
+        tabIndex={-1}
+        onFocus={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        value={subMethod.value}
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="l">Linear (L)</option>
+        <option value="a">Affine (A)</option>
+        <option value="i">Relevant (I)</option>
+        <option value="k">Full (K)</option>
+      </select>
+      {method.value === "deltanets" && <select
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="l">3 Agents (default)</option>
+        <option value="a">Single-agent</option>
+      </select>}
+      {method.value === "deltanets" && <select
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="l">Absolute levels (default)</option>
+        <option value="a">Relative levels</option>
+      </select>}
       <select
         onChange={(e) => {
           const selectedExampleIndex = parseInt(

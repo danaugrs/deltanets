@@ -18,11 +18,6 @@ Not = λp.p F T # Logical NOT
 And T F`,
   },
   {
-    name: "Two Squared Twice",
-    code: `# Two Squared Twice
-(λa.a (a a)) λf.λx.f (f x)`,
-  },
-  {
     name: "Lamping A",
     code: `# Lamping A
 (λx.(λy.((λf.((λh.(h (λp.(h (λq.p))))) (λl.(((f (λn.(l n))) x) y)))) (λg.(λu.(λv.((g u) (g v))))))))`,
@@ -41,6 +36,11 @@ And T F`,
     name: "Y (Non-Normalizing)",
     code: `# Y (Non-Normalizing)
 λf.(λx.f (x x)) (λx.f (x x))`,
+  },
+  {
+    name: "Two Squared Twice",
+    code: `# Two Squared Twice
+(λa.a (a a)) λf.λx.f (f x)`,
   },
   {
     name: "Erasure vs Sharing",

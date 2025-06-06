@@ -235,7 +235,7 @@ export default function App() {
     }
     batch(() =>
       Object.keys(METHODS).forEach((m) => {
-        METHODS[m].state.value = METHODS[m].init(astValue, systemType.value, singleAgent.value, relativeLevel.value);
+        METHODS[m].state.value = METHODS[m].init(astValue, selectedSystemType.value, singleAgent.value, relativeLevel.value);
       })
     );
   };
@@ -272,7 +272,7 @@ export default function App() {
     const node2D = currentMethod.render(
       currentState as Signal<MethodState<any>>,
       lastExpression,
-      systemType.value,
+      selectedSystemType.value,
       singleAgent.value,
       relativeLevel.value,
     );

@@ -36,7 +36,7 @@ function init(ast: AstNode, systemType: SystemType, singleAgent: boolean, relati
   link(rootPort, { node: rootNode, port: 0 });
 
   // If all replicators have exactly one auxiliary port, then remove all replicators below, not just those with zero level delta.
-  let removeAllReps: boolean = false; // TODO: ADD TOGGLE FOR THIS VALUE
+  let removeAllReps: boolean = systemType === "linear" || systemType === "affine";
   graph.forEach((node) => {
     if (node.type.startsWith("rep") && node.ports.length !== 2) {
       removeAllReps = false;

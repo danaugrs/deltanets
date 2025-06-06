@@ -53,7 +53,8 @@ export default function App() {
   // Reduction method
   const storedMethod = IS_BROWSER && window.localStorage.getItem("method");
   const method = useSignal<string>(storedMethod || Object.keys(METHODS)[0]);
-  const subMethod = useSignal<SystemType>("full");
+  const systemType = useSignal<SystemType>("full");
+  const selectedSystemType = useSignal<SystemType>("full");
 
   // Theme
   const storedTheme = IS_BROWSER && window.localStorage.getItem("theme");
@@ -219,7 +220,8 @@ export default function App() {
       batch(() => {
         exprError.value = false;
         ast.value = newAst.ast ?? null;
-        subMethod.value = getExpressionType(ast.value!);
+        systemType.value = getExpressionType(ast.value!);
+        selectedSystemType.value = systemType.value;
       });
     }
   };
@@ -383,80 +385,6 @@ export default function App() {
     >
       <select
         onChange={(e) => {
-          const newMethod = (e?.target as HTMLSelectElement).value;
-          window.localStorage.setItem("method", newMethod);
-          batch(() => {
-            method.value = newMethod;
-            // Set isFirstLoad to true to force centering when method changes
-            isFirstLoad.value = true;
-          });
-        }}
-        tabIndex={-1}
-        onFocus={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        value={method.value}
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit flex-1"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}
-      >
-        {Object.entries(METHODS).map(([methodKey, methodData]) => (
-          <option key={methodKey} value={methodKey}>
-            {methodData.name}
-          </option>
-        ))}
-      </select>
-      <select
-        // This select is just an indicator in the lambda calculus method
-        disabled={method.value === "lambdacalc"}
-        onChange={(e) => {
-          // const newMethod = (e?.target as HTMLSelectElement).value;
-          // window.localStorage.setItem("method", newMethod);
-          // batch(() => {
-          //   method.value = newMethod;
-          //   // Set isFirstLoad to true to force centering when method changes
-          //   isFirstLoad.value = true;
-          // });
-        }}
-        tabIndex={-1}
-        onFocus={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        value={subMethod.value}
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}>
-        <option value="linear">Linear (L)</option>
-        <option value="affine">Affine (A)</option>
-        <option value="relevant">Relevant (I)</option>
-        <option value="full">Full (K)</option>
-      </select>
-      {method.value === "deltanets" && <select
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}>
-        <option value="l">3 Agents (default)</option>
-        <option value="a">Single-agent</option>
-      </select>}
-      {method.value === "deltanets" && <select
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}>
-        <option value="l">Absolute levels (default)</option>
-        <option value="a">Relative levels</option>
-      </select>}
-      <select
-        onChange={(e) => {
           const selectedExampleIndex = parseInt(
             (e?.target as HTMLSelectElement).value,
           );
@@ -501,6 +429,75 @@ export default function App() {
           </option>
         ))}
       </select>
+      <select
+        onChange={(e) => {
+          const newMethod = (e?.target as HTMLSelectElement).value;
+          window.localStorage.setItem("method", newMethod);
+          batch(() => {
+            method.value = newMethod;
+            // Set isFirstLoad to true to force centering when method changes
+            isFirstLoad.value = true;
+          });
+        }}
+        tabIndex={-1}
+        onFocus={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        value={method.value}
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit flex-1"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}
+      >
+        {Object.entries(METHODS).map(([methodKey, methodData]) => (
+          <option key={methodKey} value={methodKey}>
+            {methodData.name}
+          </option>
+        ))}
+      </select>
+      <select
+        // This select is just an indicator in the lambda calculus method
+        disabled={method.value === "lambdacalc"}
+        onChange={(e) => {
+          const newSystemType = (e?.target as HTMLSelectElement).value;
+          selectedSystemType.value = newSystemType as SystemType;
+        }}
+        tabIndex={-1}
+        onFocus={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        value={selectedSystemType.value}
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="linear" disabled={systemType.value !== "linear"}>Linear (L)</option>
+        <option value="affine" disabled={systemType.value === "relevant" || systemType.value === "full"}>Affine (A)</option>
+        <option value="relevant" disabled={systemType.value === "affine" || systemType.value === "full"}>Relevant (I)</option>
+        <option value="full">Full (K)</option>
+      </select>
+      {method.value === "deltanets" && <select
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="l">3 Agents (default)</option>
+        <option value="a">Single-agent</option>
+      </select>}
+      {method.value === "deltanets" && <select
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="l">Absolute levels (default)</option>
+        <option value="a">Relative levels</option>
+      </select>}
       <button
         type="button"
         title="Return to the beginning. Keyboard shortcut: Shift + left arrow key."

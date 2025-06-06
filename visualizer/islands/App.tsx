@@ -55,6 +55,8 @@ export default function App() {
   const method = useSignal<string>(storedMethod || Object.keys(METHODS)[0]);
   const systemType = useSignal<SystemType>("full");
   const selectedSystemType = useSignal<SystemType>("full");
+  const singleAgent = useSignal<boolean>(false);
+  const relativeLevel = useSignal<boolean>(false);
 
   // Theme
   const storedTheme = IS_BROWSER && window.localStorage.getItem("theme");
@@ -481,22 +483,32 @@ export default function App() {
         <option value="full">Full (K)</option>
       </select>
       {method.value === "deltanets" && <select
+        value={singleAgent.value ? "default" : "single"}
+        onChange={(e) => {
+          const newSingleAgent = (e?.target as HTMLSelectElement).value === "a";
+          singleAgent.value = newSingleAgent;
+        }}
         class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
           background: theme.value === "light" ? "white" : "#1A1A1A",
         }}>
-        <option value="l">3 Agents (default)</option>
-        <option value="a">Single-agent</option>
+        <option value="default">3 Agents (default)</option>
+        <option value="single">Single-agent</option>
       </select>}
       {method.value === "deltanets" && <select
+        value={relativeLevel.value ? "relative" : "absolute"}
+        onChange={(e) => {
+          const newRelativeLevel = (e?.target as HTMLSelectElement).value === "a";
+          relativeLevel.value = newRelativeLevel;
+        }}
         class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
           background: theme.value === "light" ? "white" : "#1A1A1A",
         }}>
-        <option value="l">Absolute levels (default)</option>
-        <option value="a">Relative levels</option>
+        <option value="absolute">Absolute levels (default)</option>
+        <option value="relative">Relative levels</option>
       </select>}
       <button
         type="button"

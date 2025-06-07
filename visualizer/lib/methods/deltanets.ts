@@ -580,7 +580,12 @@ const renderNodePort = (
     endpoints.push({ nodePort, node2D });
   } else if ((nodePort.node.type === "abs" || (nodePort.node.type === "rep-out" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 0) {
     nodePort.node.isCreated = true;
-    const fan = new Fan("up", nodePort.node.label);
+    let fan 
+    if (singleAgent) {
+      fan = new Replicator("up", nodePort.node.label, nodePort.node.levelDeltas!);
+    } else {
+      fan = new Fan("up", nodePort.node.label);
+    }
 
     const { node2D: body, endpoints: bodyEndpoints } = renderNodePort(
       nodePort.node.ports[1],
@@ -649,9 +654,14 @@ const renderNodePort = (
     node2D.add(body);
 
     endpoints = [...endpoints, ...bodyEndpoints];
-  } else if (nodePort.node.type === "app" && nodePort.port === 1) {
+  } else if ((nodePort.node.type === "app" ||  (nodePort.node.type === "rep-in" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 1) {
     nodePort.node.isCreated = true;
-    const fan = new Fan("down", nodePort.node.label);
+    let fan 
+    if (singleAgent) {
+      fan = new Replicator("down", nodePort.node.label, nodePort.node.levelDeltas!);
+    } else {
+      fan = new Fan("down", nodePort.node.label);
+    }
     fan.pos.x = Fan.PORT_DELTA;
 
     const { node2D: func, endpoints: funcEndpoints } = renderNodePort(

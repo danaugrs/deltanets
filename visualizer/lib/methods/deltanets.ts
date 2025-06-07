@@ -154,7 +154,7 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
       node.ports[1].node.type === "era"
     ) {
       fanDecays = true;
-      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
+      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph, relativeLevel));
     }
   }
 
@@ -399,6 +399,8 @@ function render(
     rootNode.ports[0],
     state,
     redexes,
+    0,
+    singleAgent
   );
   rootNode.isCreated = true;
   mainTreeNode2D.pos.y = 2 * D;
@@ -462,6 +464,8 @@ function render(
       node.ports[0],
       state,
       redexes,
+      0,
+      singleAgent
     );
     lastX -= eraTree.bounds.min.x;
     eraTree.pos.x = lastX;
@@ -552,6 +556,7 @@ const renderNodePort = (
   state: Signal<State>,
   redexes: Redex[],
   level: number = 0,
+  singleAgent: boolean = false,
 ): { node2D: Node2D; endpoints: Endpoint[] } => {
   const node2D = new Node2D();
   let endpoints: Endpoint[] = [];
@@ -573,7 +578,7 @@ const renderNodePort = (
     const era = new Eraser();
     node2D.add(era);
     endpoints.push({ nodePort, node2D });
-  } else if (nodePort.node.type === "abs" && nodePort.port === 0) {
+  } else if ((nodePort.node.type === "abs" || (nodePort.node.type === "rep-out" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 0) {
     nodePort.node.isCreated = true;
     const fan = new Fan("up", nodePort.node.label);
 
@@ -582,6 +587,7 @@ const renderNodePort = (
       state,
       redexes,
       level,
+      singleAgent
     );
     body.pos.x = Math.max(Fan.PORT_DELTA, -body.bounds.min.x - D);
     body.pos.y = (body as any).isWireEndpoint
@@ -653,6 +659,7 @@ const renderNodePort = (
       state,
       redexes,
       level,
+      singleAgent
     );
     func.pos.x = Fan.PORT_DELTA;
     func.pos.y = (func as any).isWireEndpoint
@@ -692,6 +699,7 @@ const renderNodePort = (
       state,
       redexes,
       level + 1,
+      singleAgent
     );
     arg.pos.x = nodePort.node.ports[2].node.type === "var"
       ? fan.bounds.max.x - arg.bounds.min.x + 2 * D
@@ -736,6 +744,7 @@ const renderNodePort = (
       state,
       redexes,
       childLevel,
+      singleAgent,
     );
     child.pos.x = -parentPortDelta;
     child.pos.y = rep.pos.y +
@@ -855,6 +864,7 @@ const renderNodePort = (
         state,
         redexes,
         childLevel,
+        singleAgent
       );
       if (allChildrenAreWireEndpoints && !(child as any).isWireEndpoint) {
         allChildrenAreWireEndpoints = false;
@@ -1354,7 +1364,7 @@ export type NodeType =
 export type Node = {
   type: NodeType;
   ports: NodePort[];
-  label?: string;
+  label: string;
   isCreated?: boolean; // This is set to true when the associated tree is created (helps identify disjointed graphs, and, more importantly, is used to mark that a shared node like a dup or rep has been created and does not need to be created again)
   levelDeltas?: number[]; // If `type` is "rep-in" or "rep-out", then this specifies the level delta of each aux port
 };

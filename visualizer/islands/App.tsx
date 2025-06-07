@@ -262,8 +262,7 @@ export default function App() {
     // Log current state
     const stateStack = currentState.value.stack;
     console.log(
-      `${currentMethod.name} (${currentState.value.idx}/${
-        stateStack.length - 1
+      `${currentMethod.name} (${currentState.value.idx}/${stateStack.length - 1
       }):`,
       stateStack[currentState.value.idx],
     );
@@ -376,8 +375,7 @@ export default function App() {
   });
 
   const squareButtonClass =
-    `border-1 rounded p-2 text-xl min-h-[44px] min-w-[44px] bg-inherit flex flex-row justify-center items-center disabled:opacity-[0.4] disabled:cursor-not-allowed hover:bg-[${
-      theme.value === "light" ? "white" : "#2A2A2A"
+    `border-1 rounded p-2 text-xl min-h-[44px] min-w-[44px] bg-inherit flex flex-row justify-center items-center disabled:opacity-[0.4] disabled:cursor-not-allowed hover:bg-[${theme.value === "light" ? "white" : "#2A2A2A"
     }] disabled:bg-transparent`;
 
   const toolbar = (
@@ -413,9 +411,8 @@ export default function App() {
           // Reset centering
           center.value = originalCenter;
         }}
-        class={`border-1 rounded px-1 text-xl min-h-[44px] bg-inherit w-[120px] bg-transparent hover:bg-[${
-          theme.value === "light" ? "white" : "#2A2A2A"
-        }] disabled:bg-transparent`}
+        class={`border-1 rounded px-1 text-xl min-h-[44px] bg-inherit w-[120px] bg-transparent hover:bg-[${theme.value === "light" ? "white" : "#2A2A2A"
+          }] disabled:bg-transparent`}
         style={{
           borderColor: theme.value === "light" ? "#FAFAFA" : "#222",
         }}
@@ -485,7 +482,8 @@ export default function App() {
         <option value="relevant" disabled={systemType.value === "affine" || systemType.value === "full"}>Relevant (I)</option>
         <option value="full">Full (K)</option>
       </select>
-      {method.value === "deltanets" && <select
+      {/* Single-agent formulation is commented out as it would require two types of replicator (or a boolean flag) to correctly track replicator pairedness. */}
+      {/* {method.value === "deltanets" && <select
         value={singleAgent.value ? "single" : "default"}
         onChange={(e) => {
           const newSingleAgent = (e?.target as HTMLSelectElement).value === "single";
@@ -498,7 +496,7 @@ export default function App() {
         }}>
         <option value="default">3 Agents (default)</option>
         <option value="single">Single-agent</option>
-      </select>}
+      </select>} */}
       {method.value === "deltanets" && <select
         value={relativeLevel.value ? "relative" : "absolute"}
         onChange={(e) => {
@@ -559,7 +557,7 @@ export default function App() {
         disabled={!METHODS[method.value].state.value?.forward}
       >
         {METHODS[method.value].state.value?.idx! <
-            METHODS[method.value].state.value?.stack.length! - 1
+          METHODS[method.value].state.value?.stack.length! - 1
           ? <IconArrowRight />
           : <IconArrowRightToArc />}
       </button>
@@ -577,9 +575,8 @@ export default function App() {
       </button>
       <button
         type="button"
-        title={`Toggle auto-centering (currently ${
-          center.value ? "ON" : "OFF"
-        })`}
+        title={`Toggle auto-centering (currently ${center.value ? "ON" : "OFF"
+          })`}
         class={squareButtonClass}
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
@@ -639,9 +636,8 @@ export default function App() {
       </button>
       <button
         type="button"
-        title={`Toggle visual debugging helpers (currently ${
-          debug.value ? "ON" : "OFF"
-        })`}
+        title={`Toggle visual debugging helpers (currently ${debug.value ? "ON" : "OFF"
+          })`}
         class={squareButtonClass}
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
@@ -723,9 +719,8 @@ export default function App() {
           </div>
           <div
             id="splitter"
-            class={`hover:(bg-[${
-              theme.value === "light" ? "white" : "#2A2A2A"
-            }] cursor-ew-resize)`}
+            class={`hover:(bg-[${theme.value === "light" ? "white" : "#2A2A2A"
+              }] cursor-ew-resize)`}
             style={{ width: "8px" }}
             onDragStart={(e) => {
               e.preventDefault();

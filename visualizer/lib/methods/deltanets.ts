@@ -580,12 +580,14 @@ const renderNodePort = (
     endpoints.push({ nodePort, node2D });
   } else if ((nodePort.node.type === "abs" || (nodePort.node.type === "rep-out" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 0) {
     nodePort.node.isCreated = true;
+
     let fan 
     if (singleAgent) {
       fan = new Replicator("up", nodePort.node.label, nodePort.node.levelDeltas!);
     } else {
       fan = new Fan("up", nodePort.node.label);
     }
+    const HEIGHT = singleAgent ? Replicator.HEIGHT : Fan.HEIGHT;
 
     const { node2D: body, endpoints: bodyEndpoints } = renderNodePort(
       nodePort.node.ports[1],
@@ -596,7 +598,7 @@ const renderNodePort = (
     );
     body.pos.x = Math.max(Fan.PORT_DELTA, -body.bounds.min.x - D);
     body.pos.y = (body as any).isWireEndpoint
-      ? Fan.HEIGHT
+      ? HEIGHT
       : fan.bounds.max.y - body.bounds.min.y;
 
 
@@ -612,7 +614,7 @@ const renderNodePort = (
         funcWire.highlightColor = SUBOPTIMAL_HIGHLIGHT_COLOR;
       }
       funcWire.startOffset.x = Fan.PORT_DELTA;
-      funcWire.startOffset.y = Fan.HEIGHT;
+      funcWire.startOffset.y = HEIGHT;
       node2D.add(funcWire);
     } else {
       // Add redex to the appropriate endpoint
@@ -632,7 +634,7 @@ const renderNodePort = (
       endpoints.push({ nodePort: nodePort.node.ports[2], node2D: era, level });
       const wire = new Wire(fan, era, 0, undefined, levelColor(level + 1));
       wire.startOffset.x = -Fan.PORT_DELTA;
-      wire.startOffset.y = Fan.HEIGHT;
+      wire.startOffset.y = HEIGHT;
       wire.endOffset.y = -Eraser.RADIUS;
       node2D.add(wire);
     } else {
@@ -640,7 +642,7 @@ const renderNodePort = (
       const endpoint = new Node2D();
       endpoint.bounds = { min: { x: -D, y: 0 }, max: { x: D, y: D } };
       endpoint.pos.x = -Fan.PORT_DELTA;
-      endpoint.pos.y = Fan.HEIGHT;
+      endpoint.pos.y = HEIGHT;
       node2D.add(endpoint);
       (endpoint as any).isWireEndpoint = true;
       endpoints.push({
@@ -656,12 +658,15 @@ const renderNodePort = (
     endpoints = [...endpoints, ...bodyEndpoints];
   } else if ((nodePort.node.type === "app" ||  (nodePort.node.type === "rep-in" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 1) {
     nodePort.node.isCreated = true;
+
     let fan 
     if (singleAgent) {
       fan = new Replicator("down", nodePort.node.label, nodePort.node.levelDeltas!);
     } else {
       fan = new Fan("down", nodePort.node.label);
     }
+    const HEIGHT = singleAgent ? Replicator.HEIGHT : Fan.HEIGHT;
+
     fan.pos.x = Fan.PORT_DELTA;
 
     const { node2D: func, endpoints: funcEndpoints } = renderNodePort(
@@ -673,7 +678,7 @@ const renderNodePort = (
     );
     func.pos.x = Fan.PORT_DELTA;
     func.pos.y = (func as any).isWireEndpoint
-      ? Fan.HEIGHT
+      ? HEIGHT
       : fan.bounds.max.y - func.bounds.min.y;
 
 
@@ -694,7 +699,7 @@ const renderNodePort = (
       if (redex?.optimal === false) {
         funcWire.highlightColor = SUBOPTIMAL_HIGHLIGHT_COLOR;
       }
-      funcWire.startOffset.y = Fan.HEIGHT;
+      funcWire.startOffset.y = HEIGHT;
       node2D.add(funcWire);
     } else {
       // Add redex to the appropriate endpoint
@@ -725,7 +730,7 @@ const renderNodePort = (
     node2D.add(arg);
 
     endpoints = [...funcEndpoints, ...argEndpoints];
-  } else if (nodePort.node.type.startsWith("rep") && nodePort.port !== 0) {
+  } else if (nodePort.node.type.startsWith("rep") && parseRepLabel(nodePort.node.label).level > 0 && nodePort.port !== 0) {
     if (nodePort.node.type !== "rep-in") {
       console.error("WRONG REP TYPE - EXPECTED rep-in", nodePort.node.type);
     }

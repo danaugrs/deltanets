@@ -486,7 +486,7 @@ export default function App() {
         <option value="full">Full (K)</option>
       </select>
       {method.value === "deltanets" && <select
-        value={singleAgent.value ? "default" : "single"}
+        value={singleAgent.value ? "single" : "default"}
         onChange={(e) => {
           const newSingleAgent = (e?.target as HTMLSelectElement).value === "single";
           singleAgent.value = newSingleAgent;

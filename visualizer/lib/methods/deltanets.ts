@@ -1034,7 +1034,18 @@ function addAstNodeToGraph(
     // Create abstraction node with eraser
     const eraser: Node = { type: "era", label: "era", ports: [] };
     graph.push(eraser);
-    const node: Node = { type: "abs", label: "λ" + astNode.name, ports: [] };
+    const node: Node = {
+      type: singleAgent ? "rep-out" : "abs",
+      label: singleAgent ? formatRepLabel(0, "unknown") : "λ" + astNode.name,
+      ports: [],
+    };
+    if (singleAgent) {
+      if (relativeLevel) {
+        node.levelDeltas = [0, 1];
+      } else {
+        node.levelDeltas = [0, 0];
+      }
+    }
     graph.push(node);
     link({ node: eraser, port: 0 }, { node, port: 2 });
 
@@ -1056,7 +1067,18 @@ function addAstNodeToGraph(
     return { node, port: 0 };
   } else if (astNode.type === "app") {
     // Create application node
-    const node: Node = { type: "app", label: "@", ports: [] };
+    const node: Node = {
+      type: singleAgent ? "rep-in" : "app",
+      label: singleAgent ? formatRepLabel(0, "unknown") : "@",
+      ports: [],
+    };
+    if (singleAgent) {
+      if (relativeLevel) {
+        node.levelDeltas = [0, 1];
+      } else {
+        node.levelDeltas = [0, 0];
+      }
+    }
     graph.push(node);
 
     // Parse function port

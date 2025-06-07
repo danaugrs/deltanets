@@ -55,7 +55,6 @@ export default function App() {
   const method = useSignal<string>(storedMethod || Object.keys(METHODS)[0]);
   const systemType = useSignal<SystemType>("full");
   const selectedSystemType = useSignal<SystemType>("full");
-  const singleAgent = useSignal<boolean>(false);
   const relativeLevel = useSignal<boolean>(false);
 
   // Theme
@@ -235,7 +234,7 @@ export default function App() {
     }
     batch(() =>
       Object.keys(METHODS).forEach((m) => {
-        METHODS[m].state.value = METHODS[m].init(astValue, selectedSystemType.value, singleAgent.value, relativeLevel.value);
+        METHODS[m].state.value = METHODS[m].init(astValue, selectedSystemType.value, relativeLevel.value);
       })
     );
   };
@@ -272,7 +271,6 @@ export default function App() {
       currentState as Signal<MethodState<any>>,
       lastExpression,
       selectedSystemType.value,
-      singleAgent.value,
       relativeLevel.value,
     );
     scene.value = node2D;
@@ -482,21 +480,6 @@ export default function App() {
         <option value="relevant" disabled={systemType.value === "affine" || systemType.value === "full"}>Relevant (I)</option>
         <option value="full">Full (K)</option>
       </select>
-      {/* Single-agent formulation is commented out as it would require two types of replicator (or a boolean flag) to correctly track replicator pairedness. */}
-      {/* {method.value === "deltanets" && <select
-        value={singleAgent.value ? "single" : "default"}
-        onChange={(e) => {
-          const newSingleAgent = (e?.target as HTMLSelectElement).value === "single";
-          singleAgent.value = newSingleAgent;
-        }}
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}>
-        <option value="default">3 Agents (default)</option>
-        <option value="single">Single-agent</option>
-      </select>} */}
       {method.value === "deltanets" && <select
         value={relativeLevel.value ? "relative" : "absolute"}
         onChange={(e) => {

@@ -24,11 +24,11 @@ export default method;
 
 type State = MethodState<Graph>;
 
-function init(ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean): State {
+function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): State {
   const graph: Graph = [];
 
   // Build graph
-  const rootPort = addAstNodeToGraph(ast, graph, new Map(), 0, singleAgent, relativeLevel);
+  const rootPort = addAstNodeToGraph(ast, graph, new Map(), 0, relativeLevel);
 
   // Add root node
   const rootNode: Node = { type: "root", label: "root", ports: [rootPort] };
@@ -154,7 +154,7 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
       node.ports[1].node.type === "era"
     ) {
       fanDecays = true;
-      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph, relativeLevel));
+      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
     }
   }
 
@@ -380,7 +380,6 @@ function render(
   state: Signal<State>,
   expression: Signal<string>,
   systemType: SystemType,
-  singleAgent: boolean,
   relativeLevel: boolean,
 ): Node2D {
   const currState = state.peek()!;
@@ -399,8 +398,6 @@ function render(
     rootNode.ports[0],
     state,
     redexes,
-    0,
-    singleAgent
   );
   rootNode.isCreated = true;
   mainTreeNode2D.pos.y = 2 * D;
@@ -464,8 +461,6 @@ function render(
       node.ports[0],
       state,
       redexes,
-      0,
-      singleAgent
     );
     lastX -= eraTree.bounds.min.x;
     eraTree.pos.x = lastX;
@@ -556,7 +551,6 @@ const renderNodePort = (
   state: Signal<State>,
   redexes: Redex[],
   level: number = 0,
-  singleAgent: boolean = false,
 ): { node2D: Node2D; endpoints: Endpoint[] } => {
   const node2D = new Node2D();
   let endpoints: Endpoint[] = [];
@@ -578,27 +572,19 @@ const renderNodePort = (
     const era = new Eraser();
     node2D.add(era);
     endpoints.push({ nodePort, node2D });
-  } else if ((nodePort.node.type === "abs" || (nodePort.node.type === "rep-out" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 0) {
+  } else if (nodePort.node.type === "abs" && nodePort.port === 0) {
     nodePort.node.isCreated = true;
-
-    let fan 
-    if (singleAgent) {
-      fan = new Replicator("up", nodePort.node.label, nodePort.node.levelDeltas!);
-    } else {
-      fan = new Fan("up", nodePort.node.label);
-    }
-    const HEIGHT = singleAgent ? Replicator.HEIGHT : Fan.HEIGHT;
+    const fan = new Fan("up", nodePort.node.label);
 
     const { node2D: body, endpoints: bodyEndpoints } = renderNodePort(
       nodePort.node.ports[1],
       state,
       redexes,
       level,
-      singleAgent
     );
     body.pos.x = Math.max(Fan.PORT_DELTA, -body.bounds.min.x - D);
     body.pos.y = (body as any).isWireEndpoint
-      ? HEIGHT
+      ? Fan.HEIGHT
       : fan.bounds.max.y - body.bounds.min.y;
 
 
@@ -614,7 +600,7 @@ const renderNodePort = (
         funcWire.highlightColor = SUBOPTIMAL_HIGHLIGHT_COLOR;
       }
       funcWire.startOffset.x = Fan.PORT_DELTA;
-      funcWire.startOffset.y = HEIGHT;
+      funcWire.startOffset.y = Fan.HEIGHT;
       node2D.add(funcWire);
     } else {
       // Add redex to the appropriate endpoint
@@ -634,7 +620,7 @@ const renderNodePort = (
       endpoints.push({ nodePort: nodePort.node.ports[2], node2D: era, level });
       const wire = new Wire(fan, era, 0, undefined, levelColor(level + 1));
       wire.startOffset.x = -Fan.PORT_DELTA;
-      wire.startOffset.y = HEIGHT;
+      wire.startOffset.y = Fan.HEIGHT;
       wire.endOffset.y = -Eraser.RADIUS;
       node2D.add(wire);
     } else {
@@ -642,7 +628,7 @@ const renderNodePort = (
       const endpoint = new Node2D();
       endpoint.bounds = { min: { x: -D, y: 0 }, max: { x: D, y: D } };
       endpoint.pos.x = -Fan.PORT_DELTA;
-      endpoint.pos.y = HEIGHT;
+      endpoint.pos.y = Fan.HEIGHT;
       node2D.add(endpoint);
       (endpoint as any).isWireEndpoint = true;
       endpoints.push({
@@ -656,17 +642,9 @@ const renderNodePort = (
     node2D.add(body);
 
     endpoints = [...endpoints, ...bodyEndpoints];
-  } else if ((nodePort.node.type === "app" ||  (nodePort.node.type === "rep-in" && parseRepLabel(nodePort.node.label).level === 0 && singleAgent)) && nodePort.port === 1) {
+  } else if (nodePort.node.type === "app" && nodePort.port === 1) {
     nodePort.node.isCreated = true;
-
-    let fan 
-    if (singleAgent) {
-      fan = new Replicator("down", nodePort.node.label, nodePort.node.levelDeltas!);
-    } else {
-      fan = new Fan("down", nodePort.node.label);
-    }
-    const HEIGHT = singleAgent ? Replicator.HEIGHT : Fan.HEIGHT;
-
+    const fan = new Fan("down", nodePort.node.label);
     fan.pos.x = Fan.PORT_DELTA;
 
     const { node2D: func, endpoints: funcEndpoints } = renderNodePort(
@@ -674,11 +652,10 @@ const renderNodePort = (
       state,
       redexes,
       level,
-      singleAgent
     );
     func.pos.x = Fan.PORT_DELTA;
     func.pos.y = (func as any).isWireEndpoint
-      ? HEIGHT
+      ? Fan.HEIGHT
       : fan.bounds.max.y - func.bounds.min.y;
 
 
@@ -699,7 +676,7 @@ const renderNodePort = (
       if (redex?.optimal === false) {
         funcWire.highlightColor = SUBOPTIMAL_HIGHLIGHT_COLOR;
       }
-      funcWire.startOffset.y = HEIGHT;
+      funcWire.startOffset.y = Fan.HEIGHT;
       node2D.add(funcWire);
     } else {
       // Add redex to the appropriate endpoint
@@ -714,7 +691,6 @@ const renderNodePort = (
       state,
       redexes,
       level + 1,
-      singleAgent
     );
     arg.pos.x = nodePort.node.ports[2].node.type === "var"
       ? fan.bounds.max.x - arg.bounds.min.x + 2 * D
@@ -730,7 +706,7 @@ const renderNodePort = (
     node2D.add(arg);
 
     endpoints = [...funcEndpoints, ...argEndpoints];
-  } else if (nodePort.node.type.startsWith("rep") && parseRepLabel(nodePort.node.label).level > 0 && nodePort.port !== 0) {
+  } else if (nodePort.node.type.startsWith("rep") && nodePort.port !== 0) {
     if (nodePort.node.type !== "rep-in") {
       console.error("WRONG REP TYPE - EXPECTED rep-in", nodePort.node.type);
     }
@@ -759,7 +735,6 @@ const renderNodePort = (
       state,
       redexes,
       childLevel,
-      singleAgent,
     );
     child.pos.x = -parentPortDelta;
     child.pos.y = rep.pos.y +
@@ -879,7 +854,6 @@ const renderNodePort = (
         state,
         redexes,
         childLevel,
-        singleAgent
       );
       if (allChildrenAreWireEndpoints && !(child as any).isWireEndpoint) {
         allChildrenAreWireEndpoints = false;
@@ -1052,25 +1026,13 @@ function addAstNodeToGraph(
     { level: number; nodePort: NodePort; firstUsageLevel?: number }
   > = new Map(),
   level: number = 0,
-  singleAgent: boolean,
   relativeLevel: boolean,
 ): NodePort {
   if (astNode.type === "abs") {
     // Create abstraction node with eraser
     const eraser: Node = { type: "era", label: "era", ports: [] };
     graph.push(eraser);
-    const node: Node = {
-      type: singleAgent ? "rep-out" : "abs",
-      label: singleAgent ? formatRepLabel(0, "unknown") : "λ" + astNode.name,
-      ports: [],
-    };
-    if (singleAgent) {
-      if (relativeLevel) {
-        node.levelDeltas = [0, 1];
-      } else {
-        node.levelDeltas = [0, 0];
-      }
-    }
+    const node: Node = { type: "abs", label: "λ" + astNode.name, ports: [] };
     graph.push(node);
     link({ node: eraser, port: 0 }, { node, port: 2 });
 
@@ -1079,7 +1041,7 @@ function addAstNodeToGraph(
     vars.set(astNode.name, { level, nodePort: { node, port: 2 } });
 
     // Parse body port
-    const bodyPort = addAstNodeToGraph(astNode.body, graph, vars, level, singleAgent, relativeLevel);
+    const bodyPort = addAstNodeToGraph(astNode.body, graph, vars, level, relativeLevel);
     link(bodyPort, { node, port: 1 });
 
     // Need to restore original vars (if any) instead of deleting
@@ -1092,26 +1054,15 @@ function addAstNodeToGraph(
     return { node, port: 0 };
   } else if (astNode.type === "app") {
     // Create application node
-    const node: Node = {
-      type: singleAgent ? "rep-in" : "app",
-      label: singleAgent ? formatRepLabel(0, "unknown") : "@",
-      ports: [],
-    };
-    if (singleAgent) {
-      if (relativeLevel) {
-        node.levelDeltas = [0, 1];
-      } else {
-        node.levelDeltas = [0, 0];
-      }
-    }
+    const node: Node = { type: "app", label: "@", ports: [] };
     graph.push(node);
 
     // Parse function port
-    const funcPort = addAstNodeToGraph(astNode.func, graph, vars, level, singleAgent, relativeLevel);
+    const funcPort = addAstNodeToGraph(astNode.func, graph, vars, level, relativeLevel);
     link(funcPort, { node, port: 0 });
 
     // Parse argument port
-    const argPort = addAstNodeToGraph(astNode.arg, graph, vars, level + 1, singleAgent, relativeLevel);
+    const argPort = addAstNodeToGraph(astNode.arg, graph, vars, level + 1, relativeLevel);
     link(argPort, { node, port: 2 });
 
     // Return parent port
@@ -1379,7 +1330,7 @@ export type NodeType =
 export type Node = {
   type: NodeType;
   ports: NodePort[];
-  label: string;
+  label?: string;
   isCreated?: boolean; // This is set to true when the associated tree is created (helps identify disjointed graphs, and, more importantly, is used to mark that a shared node like a dup or rep has been created and does not need to be created again)
   levelDeltas?: number[]; // If `type` is "rep-in" or "rep-out", then this specifies the level delta of each aux port
 };

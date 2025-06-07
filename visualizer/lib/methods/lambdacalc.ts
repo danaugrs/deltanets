@@ -31,7 +31,7 @@ type State = MethodState<AstNode>;
 
 // Initialize the state by copying the initial AST.
 // Ignores configuration options - they are hidden in the UI.
-function init(ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean): State {
+function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): State {
   return { idx: 0, stack: [clone(ast)] };
 }
 
@@ -42,7 +42,6 @@ function render(
   state: Signal<State>,
   expression: Signal<string>,
   systemType: SystemType,
-  singleAgent: boolean,
   relativeLevel: boolean,
 ): Node2D {
   const currState = state.peek()!;

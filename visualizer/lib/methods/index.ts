@@ -14,12 +14,11 @@ export const METHODS: Record<string, Method<any>> = {
 // Method type
 export type Method<Elem> = {
   name: string;
-  init: (ast: AstNode, systemType: SystemType, singleAgent: boolean, relativeLevel: boolean) => MethodState<Elem>;
+  init: (ast: AstNode, systemType: SystemType, relativeLevel: boolean) => MethodState<Elem>;
   render: (
     state: Signal<MethodState<Elem>>,
     expression: Signal<string>,
     systemType: SystemType,
-    singleAgent: boolean,
     relativeLevel: boolean,
   ) => Node2D;
   state: Signal<MethodState<Elem> | null>;

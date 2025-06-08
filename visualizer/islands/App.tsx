@@ -28,7 +28,7 @@ import IconBugOff from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/bug-off.t
 import IconTarget from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/target.tsx";
 import IconTargetOff from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/target-off.tsx";
 import { cleanExpr, prettifyExpr } from "../lib/util.ts";
-import { Node2D, Pos, render } from "../lib/render.ts";
+import { highlight, Node2D, Pos, render } from "../lib/render.ts";
 import { useEffect, useRef } from "preact/hooks";
 import loader, { type Monaco } from "@monaco-editor/loader";
 import examples from "../lib/examples.ts";
@@ -268,7 +268,7 @@ export default function App() {
 
     // Render graph and update scene
     const node2D = currentMethod.render(
-      currentState as Signal<MethodState<any>>,
+      currentState as Signal<MethodState<any, any>>,
       lastExpression,
       selectedSystemType.value,
       relativeLevel.value,
@@ -371,6 +371,9 @@ export default function App() {
       });
     }
   });
+
+  const deltaNetsData = METHODS[method.value].state.value?.data;
+  const isDeltaFinalStep = method.value === "deltanets" && deltaNetsData?.isFinalStep && !deltaNetsData.appliedFinalStep;
 
   const squareButtonClass =
     `border-1 rounded p-2 text-xl min-h-[44px] min-w-[44px] bg-inherit flex flex-row justify-center items-center disabled:opacity-[0.4] disabled:cursor-not-allowed hover:bg-[${theme.value === "light" ? "white" : "#2A2A2A"
@@ -535,6 +538,7 @@ export default function App() {
         class={squareButtonClass}
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: isDeltaFinalStep ? highlight(theme.value) : "transparent"
         }}
         onClick={METHODS[method.value].state.value?.forward}
         disabled={!METHODS[method.value].state.value?.forward}

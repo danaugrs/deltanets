@@ -22,7 +22,7 @@ const method: Method<Graph, Data> = {
 };
 export default method;
 
-type Data = { appliedFinalStep: boolean };
+type Data = { appliedFinalStep: boolean, isFinalStep: boolean };
 
 type State = MethodState<Graph, Data>;
 
@@ -66,7 +66,7 @@ function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): Sta
     forward: undefined,
     idx: 0,
     stack: [graph],
-    data: { appliedFinalStep: false },
+    data: { appliedFinalStep: false, isFinalStep: false },
   };
 }
 
@@ -616,6 +616,7 @@ function render(
 
     const nodesToErase = graph.filter((node) => !(node as any).keep);
     if (nodesToErase.length > 0) {
+      currState.data.isFinalStep = true;
       // console.log("nodes to erase", nodesToErase);
       const finalStep = () => {
         applyReduction(state, () => {
@@ -1505,6 +1506,7 @@ export function applyReduction(
     currState.forward = forward;
     currState.last = last;
     currState.data.appliedFinalStep = false;
+    currState.data.isFinalStep = false;
     // Trigger state update
     batch(() => {
       state.value = { ...currState };

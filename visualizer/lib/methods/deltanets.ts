@@ -590,7 +590,7 @@ function render(
   } else if (!currState.data.appliedFinalStep) {
     // Traverse all nodes starting at the root and marking them as "keep" then erase non maked nodes
     const traverse = (nodePort: NodePort) => {
-      console.log("traverse", nodePort.node.label);
+      // console.log("traverse", nodePort.node.label);
       const node = nodePort.node;
       const port = nodePort.port;
       (node as any).keep = true;
@@ -615,9 +615,8 @@ function render(
     traverse(rootNode.ports[0]);
 
     const nodesToErase = graph.filter((node) => !(node as any).keep);
-
     if (nodesToErase.length > 0) {
-      console.log("nodes to erase", nodesToErase);
+      // console.log("nodes to erase", nodesToErase);
       const finalStep = () => {
         applyReduction(state, () => {
           currState.data.appliedFinalStep = true;

@@ -438,6 +438,7 @@ export default function App() {
           window.localStorage.setItem("method", newMethod);
           batch(() => {
             method.value = newMethod;
+            selectedSystemType.value = systemType.value;
             // Set isFirstLoad to true to force centering when method changes
             isFirstLoad.value = true;
           });

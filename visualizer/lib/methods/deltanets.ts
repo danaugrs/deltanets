@@ -597,16 +597,17 @@ function render(
         const traverse = (nodePort: NodePort) => {
           console.log("traverse", nodePort.node.label);
           const node = nodePort.node;
+          const port = nodePort.port;
           (node as any).keep = true;
           // Only traverse child ports
-          if (node.type === "abs") {
+          if (node.type === "abs" && port === 0) {
             traverse(node.ports[1]);
-          } else if (node.type === "app") {
+          } else if (node.type === "app" && port === 1) {
             traverse(node.ports[0]);
             traverse(node.ports[2]);
-          } else if (node.type === "rep-in") {
+          } else if (node.type === "rep-in" && port !== 0) {
             traverse(node.ports[0]);
-          } else if (node.type === "rep-out") {
+          } else if (node.type === "rep-out" && port === 0) {
             node.ports.forEach((p) => { if (p.port !== 0) traverse(p) });
           } else if (node.type === "era") {
             // nothing to do

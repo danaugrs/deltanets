@@ -114,8 +114,8 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     // There are only app-abs annihilation pairs and they are always optimal
     for (const node of graph) {
       if (node.ports[0].port === 0) {
-        // Skip pairs with variables
-        if (node.type === "var" || node.ports[0].node.type === "var") {
+        // Skip pairs with variables or with the root node
+        if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
           continue
         }
         // Check for app-abs annihilation pairs
@@ -134,8 +134,8 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
         console.error("Error: rep in affine system", node);
       }
       if (node.ports[0].port === 0) {
-        // Skip pairs with variables
-        if (node.type === "var" || node.ports[0].node.type === "var") {
+        // Skip pairs with variables or with the root node
+        if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
           continue
         }
         if (node.type === "era") {
@@ -154,6 +154,10 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     // There are only app-abs annihilation pairs and they are always optimal
     for (const node of graph) {
       if (node.ports[0].port === 0) {
+        // Skip pairs with variables or with the root node
+        if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
+          continue
+        }
         createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
       }
     }

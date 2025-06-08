@@ -543,8 +543,8 @@ export default function App() {
         onClick={METHODS[method.value].state.value?.forward}
         disabled={!METHODS[method.value].state.value?.forward}
       >
-        {METHODS[method.value].state.value?.idx! <
-          METHODS[method.value].state.value?.stack.length! - 1
+        {(METHODS[method.value].state.value?.idx! <
+          METHODS[method.value].state.value?.stack.length! - 1) || METHODS[method.value].state.value?.forward === undefined
           ? <IconArrowRight />
           : <IconArrowRightToArc />}
       </button>

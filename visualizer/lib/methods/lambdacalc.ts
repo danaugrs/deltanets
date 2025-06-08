@@ -17,7 +17,7 @@ import { prettifyExpr } from "../util.ts";
 // Lambda calculus (naive copying)
 // When an abstraction is applied, the argument is copied N times, where N is
 // the number of times the function's bound variable is used inside its body.
-const method: Method<AstNode> = {
+const method: Method<AstNode, null> = {
   // The original lambda calculus introduced by Church was the 'relevant' lambda calculus which doesn't allow for weakening/erasure. This is why I add the '+' below to indicate that the lambda calculus started at 1936 but was extended afterwards.
   name: "λ-Calculus (1936+)",
   state: signal(null),
@@ -27,12 +27,12 @@ const method: Method<AstNode> = {
 export default method;
 
 // The naive method's state is just a stack of ASTs.
-type State = MethodState<AstNode>;
+type State = MethodState<AstNode, null>;
 
 // Initialize the state by copying the initial AST.
 // Ignores configuration options - they are hidden in the UI.
 function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): State {
-  return { idx: 0, stack: [clone(ast)] };
+  return { idx: 0, stack: [clone(ast)], data: null };
 }
 
 // Render the AST as a tree but with enclosures around abstractions.

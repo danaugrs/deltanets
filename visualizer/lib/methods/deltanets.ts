@@ -14,7 +14,7 @@ import { removeFromArrayIf } from "../util.ts";
 import { Method, MethodState } from "./index.ts";
 
 // Δ-Nets (absolute indexes)
-const method: Method<Graph> = {
+const method: Method<Graph, Data> = {
   name: "Δ-Nets (2025)",
   state: signal(null),
   init,
@@ -22,7 +22,9 @@ const method: Method<Graph> = {
 };
 export default method;
 
-type State = MethodState<Graph>;
+type Data = { appliedFinalStep: boolean };
+
+type State = MethodState<Graph, Data>;
 
 function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): State {
   const graph: Graph = [];
@@ -64,6 +66,7 @@ function init(ast: AstNode, systemType: SystemType, relativeLevel: boolean): Sta
     forward: undefined,
     idx: 0,
     stack: [graph],
+    data: { appliedFinalStep: false },
   };
 }
 
@@ -106,251 +109,311 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     }});
   }
 
-  // Check for eraser active pairs (era-era, era-fan, era-rep, era-FV)
-  let eraserActivePairs = false;
-  for (const node of graph) {
-    if (node.ports[0].node.type === "era") {
-      if (node.type !== "era") {
-        // Only set eraserActivePairs to true if the eraser is not connected to another eraser, since era-era is an annihilation which can be applied at any time
-        eraserActivePairs = true;
-      }
-      createRedex(node, node.ports[0].node, true, () => reduceErase(node, graph));
-    }
-  }
-
-  // Check for fan-fan pairs
-  let fanFanAnnihilations = false;
-  for (const node of graph) {
-    if (
-      (node.type === "abs" && node.ports[0].node.type === "app" &&
-        node.ports[0].port === 0)
-    ) {
-      fanFanAnnihilations = true;
-      createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
-    }
-  }
-
-  // Check for rep-rep annihilation pairs
-  let repRepAnnihilations = false;
-  for (const node of graph) {
-    if (
-      node.type.startsWith("rep") &&
-      node.ports[0].node.type.startsWith("rep") &&
-      node.ports[0].port === 0 &&
-      parseRepLabel(node.label!).level ===
-        parseRepLabel(node.ports[0].node.label!).level
-    ) {
-      repRepAnnihilations = true;
-      createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
-    }
-  }
-
-  // Check for fan decay
-  let fanDecays = false;
-  for (const node of graph) {
-    if (
-      (node.type === "abs" ||
-        node.type === "app") &&
-      node.ports[1].node.type === "era"
-    ) {
-      fanDecays = true;
-      createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
-    }
-  }
-
-  // Check for rep decay
-  let repDecays = false;
-  for (const node of graph) {
-    if (node.type.startsWith("rep")) {
-      // If the replicator is unpaired and has some aux erasers or if all aux ports
-      // are connected to erasers we can create one redex for each aux eraser
-      if (
-        ((parseRepLabel(node.label!).status === "unpaired") &&
-          isConnectedToSomeErasers(node)) || isConnectedToAllErasers(node)
-      ) {
-        repDecays = true;
-        node.ports.forEach((p, i) => {
-          // Only consider aux ports connected to erasers
-          if (p.node.type !== "era" || i === 0) {
-            return;
-          }
-          // Create a redex to eliminate the replicator aux port and eraser (and replicator if it only has one aux port)
-          createRedex(node, p.node, !repRepAnnihilations || node.ports[0].port !== 0 || node.ports[0].node.type === "var", () => {
-            // Get the index of the aux port to remove
-            const portIndex = node.ports.indexOf(p);
-
-            // Update the port of the nodes connected to higher index aux ports
-            node.ports.forEach((np, pi) => {
-              if (pi > portIndex) {
-                np.node.ports[np.port].port = pi - 1;
-              }
-            });
-
-            // Remove the aux port and level delta
-            removeFromArrayIf(node.ports, (np, pi) => pi === portIndex);
-            removeFromArrayIf(node.levelDeltas!, (ld, ldi) => ldi === portIndex - 1);
-
-            // If this was the only aux port
-            if (node.ports.length === 1) {
-              // Connect the eraser to what is connected to the replicator's principal port
-              link(node.ports[0], p);
-              // Remove the replicator
-              removeFromArrayIf(graph, (n) => n === node);
-            } else {
-              // Remove the eraser
-              removeFromArrayIf(graph, (n) => n === p.node);
-            }
-          });
-        });
-      }
-    }
-  }
-
-  // Check for unpaired replicator mergings and decays
-  const replicatorCanonicalizationOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
-  let replicatorCanonicalizations = false;
-  for (const node of graph) {
-    // Find pairs of consecutive replicators where the first one is unpaired
-    if (
-      node.type.startsWith("rep") &&
-      node.ports[0].node.type.startsWith("rep") &&
-      parseRepLabel(node.ports[0].node.label!).status === "unpaired"
-    ) {
-      const firstReplicator = node.ports[0].node;
-      const secondReplicator = node;
-      const secondReplicatorPort = secondReplicator.ports[0].port;
-
-      // Check if the second replicator is unpaired
-      let secondUnpaired =
-        parseRepLabel(secondReplicator.label!).status === "unpaired";
-      // Get the level delta between the two replicators
-      const levelDeltaBetween =
-        firstReplicator.levelDeltas![secondReplicatorPort - 1];
-      // Check for constraint that helps determine whether the second replicator is unpaired
-      if (!secondUnpaired) {
-        const { level: firstLevel } = parseRepLabel(firstReplicator.label!);
-        const { level: secondLevel } = parseRepLabel(secondReplicator.label!);
-        const diff = secondLevel - firstLevel;
-        if (0 <= diff && diff <= levelDeltaBetween) {
-          secondUnpaired = true;
+  // Linear system
+  if (systemType === "linear") {
+    // There are only app-abs annihilation pairs and they are always optimal
+    for (const node of graph) {
+      if (node.ports[0].port === 0) {
+        // Skip pairs with variables
+        if (node.type === "var" || node.ports[0].node.type === "var") {
+          continue
         }
-      }
-
-      if (secondUnpaired) {
-        replicatorCanonicalizations = true;
-        (firstReplicator as any).isToBeMerged = true;
-        // Merge the two replicators
-        createRedex(firstReplicator, secondReplicator, replicatorCanonicalizationOptimal, () => {
-          // Reset isToBeMerged flag
-          (firstReplicator as any).isToBeMerged = false;
-
-          firstReplicator.ports.splice(secondReplicatorPort, 1, ...secondReplicator.ports.slice(1));
-          firstReplicator.levelDeltas!.splice(secondReplicatorPort - 1, 1, ...secondReplicator.levelDeltas!.map((ld) => ld + levelDeltaBetween));
-
-          // Reorder ports of firstReplicator according to level deltas
-
-          // Zip aux ports with level deltas
-          const portsWithLevelDeltas: { nodePort: NodePort; levelDelta: number }[] = firstReplicator.ports.slice(1).map((nodePort, i) => {
-            return { nodePort, levelDelta: firstReplicator.levelDeltas![i] };
-          });
-
-          // Sort by level delta
-          portsWithLevelDeltas.sort(({ levelDelta: levelDeltaA }, { levelDelta: levelDeltaB }) => {
-            return levelDeltaA - levelDeltaB;
-          });
-
-          // Unzip aux ports and level deltas
-          const auxPorts: NodePort[] = [];
-          const levelDeltas: number[] = [];
-          portsWithLevelDeltas.forEach(({ nodePort, levelDelta }) => {
-            auxPorts.push(nodePort);
-            levelDeltas.push(levelDelta);
-          });
-
-          // // Assign aux ports to firstReplicator
-          firstReplicator.ports = [firstReplicator.ports[0], ...auxPorts];
-          firstReplicator.levelDeltas = [...levelDeltas];
-
-          // Link external ports
-          firstReplicator.ports.forEach((p, i) => link(p, { node: firstReplicator, port: i }));
-
-          // Remove secondReplicator from graph
-          removeFromArrayIf(graph, (n) => n === secondReplicator);
-        });
+        // Check for app-abs annihilation pairs
+        if (node.type === "abs" && node.ports[0].node.type !== "app" || node.type === "app" && node.ports[0].node.type !== "abs") {
+          console.error("Error: non app-abs annihilation pair in linear system", node, node.ports[0].node);
+        }
+        createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
       }
     }
   }
 
-  // Check for commutations (fan-rep, rep-rep)
-  const commutationsOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
-  let commutations = false;
-  for (const node of graph) {
-    if (node.ports[0].port === 0) {
-      // Active pair
-      if (
-        ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
-          node.ports[0].node.type === "app")))
-      ) {
-        // Fan-Rep commutation
-        commutations = true;
-        const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
-        const level = parseRepLabel(rep.label!).level;
-        createRedex(node, node.ports[0].node, commutationsOptimal && !(node as any).isToBeMerged, () => {
-          const { nodeClones } = reduceCommute(rep, graph);
-          nodeClones[0].label = formatRepLabel(level, "unknown");
-          nodeClones[1].label = formatRepLabel(relativeLevel ? level + 1 :level, "unknown");
-          nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
-        });
-      } else if (
-        node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
-      ) {
-        // Rep-Rep commutation
-        const a = node;
-        const b = node.ports[0].node;
-        commutations = true;
-        const { level: top, status: topFlag } = parseRepLabel(a.label!);
-        const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
-        if (top === bottom) {
-          createRedex(a, b, true, () => reduceAnnihilate(b, graph));
+  // Affine system
+  else if (systemType === "affine") {
+    for (const node of graph) {
+      if (node.type.startsWith("rep")) {
+        console.error("Error: rep in affine system", node);
+      }
+      if (node.ports[0].port === 0) {
+        // Skip pairs with variables
+        if (node.type === "var" || node.ports[0].node.type === "var") {
+          continue
+        }
+        if (node.type === "era") {
+          createRedex(node, node.ports[0].node, true, () => reduceErase(node.ports[0].node, graph));
+        } else if (node.ports[0].node.type === "era") {
+          createRedex(node, node.ports[0].node, true, () => reduceErase(node, graph));
         } else {
-          createRedex(a, b, commutationsOptimal && !(node as any).isToBeMerged, () => {
-            const { nodeClones, otherClones } = reduceCommute(b, graph);
-            if (top > bottom) {
-              // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
-              otherClones.forEach((node, i) => {
-                node.label = formatRepLabel(
-                  top + b.levelDeltas![i],
-                  topFlag,
-                );
-              });
-            } else {
-              // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
-              nodeClones.forEach((node, i) => {
-                node.label = formatRepLabel(
-                  bottom + a.levelDeltas![i],
-                  bottomFlag,
-                );
-              });
-            }
-          });
+          createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
         }
       }
     }
   }
 
-  // Check for aux fan replication
-  const auxFanReplicationOptimal = !commutations && commutationsOptimal;
-  let auxFanReplications = false;
-  for (const node of graph) {
-    if (
-      (node.type === "abs" || node.type === "app") &&
-      node.ports[1].node.type.startsWith("rep") &&
-      node.ports[1].port === 0
-    ) {
-      auxFanReplications = true;
-      createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph, relativeLevel));
+  // Relevant system
+  else if (systemType === "relevant") {
+    // There are only app-abs annihilation pairs and they are always optimal
+    for (const node of graph) {
+      if (node.ports[0].port === 0) {
+        createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
+      }
     }
   }
+
+  // Full system
+  else if (systemType === "full") {
+    // Check for eraser active pairs (era-era, era-fan, era-rep, era-FV)
+  }
+
+  // Otherwise, error
+  else {
+    console.error("Error: unknown system type", systemType);
+  }
+
+  // // Check for eraser active pairs (era-era, era-fan, era-rep, era-FV)
+  // let eraserActivePairs = false;
+  // for (const node of graph) {
+  //   if (node.ports[0].node.type === "era") {
+  //     if (node.type !== "era") {
+  //       // Only set eraserActivePairs to true if the eraser is not connected to another eraser, since era-era is an annihilation which can be applied at any time
+  //       eraserActivePairs = true;
+  //     }
+  //     createRedex(node, node.ports[0].node, true, () => reduceErase(node, graph));
+  //   }
+  // }
+
+  // // Check for fan-fan pairs
+  // let fanFanAnnihilations = false;
+  // for (const node of graph) {
+  //   if (
+  //     (node.type === "abs" && node.ports[0].node.type === "app" &&
+  //       node.ports[0].port === 0)
+  //   ) {
+  //     fanFanAnnihilations = true;
+  //     createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
+  //   }
+  // }
+
+  // // Check for rep-rep annihilation pairs
+  // let repRepAnnihilations = false;
+  // for (const node of graph) {
+  //   if (
+  //     node.type.startsWith("rep") &&
+  //     node.ports[0].node.type.startsWith("rep") &&
+  //     node.ports[0].port === 0 &&
+  //     parseRepLabel(node.label!).level ===
+  //       parseRepLabel(node.ports[0].node.label!).level
+  //   ) {
+  //     repRepAnnihilations = true;
+  //     createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
+  //   }
+  // }
+
+  // // Check for fan decay
+  // let fanDecays = false;
+  // for (const node of graph) {
+  //   if (
+  //     (node.type === "abs" ||
+  //       node.type === "app") &&
+  //     node.ports[1].node.type === "era"
+  //   ) {
+  //     fanDecays = true;
+  //     createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
+  //   }
+  // }
+
+  // // Check for rep decay
+  // let repDecays = false;
+  // for (const node of graph) {
+  //   if (node.type.startsWith("rep")) {
+  //     // If the replicator is unpaired and has some aux erasers or if all aux ports
+  //     // are connected to erasers we can create one redex for each aux eraser
+  //     if (
+  //       ((parseRepLabel(node.label!).status === "unpaired") &&
+  //         isConnectedToSomeErasers(node)) || isConnectedToAllErasers(node)
+  //     ) {
+  //       repDecays = true;
+  //       node.ports.forEach((p, i) => {
+  //         // Only consider aux ports connected to erasers
+  //         if (p.node.type !== "era" || i === 0) {
+  //           return;
+  //         }
+  //         // Create a redex to eliminate the replicator aux port and eraser (and replicator if it only has one aux port)
+  //         createRedex(node, p.node, !repRepAnnihilations || node.ports[0].port !== 0 || node.ports[0].node.type === "var", () => {
+  //           // Get the index of the aux port to remove
+  //           const portIndex = node.ports.indexOf(p);
+
+  //           // Update the port of the nodes connected to higher index aux ports
+  //           node.ports.forEach((np, pi) => {
+  //             if (pi > portIndex) {
+  //               np.node.ports[np.port].port = pi - 1;
+  //             }
+  //           });
+
+  //           // Remove the aux port and level delta
+  //           removeFromArrayIf(node.ports, (np, pi) => pi === portIndex);
+  //           removeFromArrayIf(node.levelDeltas!, (ld, ldi) => ldi === portIndex - 1);
+
+  //           // If this was the only aux port
+  //           if (node.ports.length === 1) {
+  //             // Connect the eraser to what is connected to the replicator's principal port
+  //             link(node.ports[0], p);
+  //             // Remove the replicator
+  //             removeFromArrayIf(graph, (n) => n === node);
+  //           } else {
+  //             // Remove the eraser
+  //             removeFromArrayIf(graph, (n) => n === p.node);
+  //           }
+  //         });
+  //       });
+  //     }
+  //   }
+  // }
+
+  // // Check for unpaired replicator mergings and decays
+  // const replicatorCanonicalizationOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
+  // let replicatorCanonicalizations = false;
+  // for (const node of graph) {
+  //   // Find pairs of consecutive replicators where the first one is unpaired
+  //   if (
+  //     node.type.startsWith("rep") &&
+  //     node.ports[0].node.type.startsWith("rep") &&
+  //     parseRepLabel(node.ports[0].node.label!).status === "unpaired"
+  //   ) {
+  //     const firstReplicator = node.ports[0].node;
+  //     const secondReplicator = node;
+  //     const secondReplicatorPort = secondReplicator.ports[0].port;
+
+  //     // Check if the second replicator is unpaired
+  //     let secondUnpaired =
+  //       parseRepLabel(secondReplicator.label!).status === "unpaired";
+  //     // Get the level delta between the two replicators
+  //     const levelDeltaBetween =
+  //       firstReplicator.levelDeltas![secondReplicatorPort - 1];
+  //     // Check for constraint that helps determine whether the second replicator is unpaired
+  //     if (!secondUnpaired) {
+  //       const { level: firstLevel } = parseRepLabel(firstReplicator.label!);
+  //       const { level: secondLevel } = parseRepLabel(secondReplicator.label!);
+  //       const diff = secondLevel - firstLevel;
+  //       if (0 <= diff && diff <= levelDeltaBetween) {
+  //         secondUnpaired = true;
+  //       }
+  //     }
+
+  //     if (secondUnpaired) {
+  //       replicatorCanonicalizations = true;
+  //       (firstReplicator as any).isToBeMerged = true;
+  //       // Merge the two replicators
+  //       createRedex(firstReplicator, secondReplicator, replicatorCanonicalizationOptimal, () => {
+  //         // Reset isToBeMerged flag
+  //         (firstReplicator as any).isToBeMerged = false;
+
+  //         firstReplicator.ports.splice(secondReplicatorPort, 1, ...secondReplicator.ports.slice(1));
+  //         firstReplicator.levelDeltas!.splice(secondReplicatorPort - 1, 1, ...secondReplicator.levelDeltas!.map((ld) => ld + levelDeltaBetween));
+
+  //         // Reorder ports of firstReplicator according to level deltas
+
+  //         // Zip aux ports with level deltas
+  //         const portsWithLevelDeltas: { nodePort: NodePort; levelDelta: number }[] = firstReplicator.ports.slice(1).map((nodePort, i) => {
+  //           return { nodePort, levelDelta: firstReplicator.levelDeltas![i] };
+  //         });
+
+  //         // Sort by level delta
+  //         portsWithLevelDeltas.sort(({ levelDelta: levelDeltaA }, { levelDelta: levelDeltaB }) => {
+  //           return levelDeltaA - levelDeltaB;
+  //         });
+
+  //         // Unzip aux ports and level deltas
+  //         const auxPorts: NodePort[] = [];
+  //         const levelDeltas: number[] = [];
+  //         portsWithLevelDeltas.forEach(({ nodePort, levelDelta }) => {
+  //           auxPorts.push(nodePort);
+  //           levelDeltas.push(levelDelta);
+  //         });
+
+  //         // // Assign aux ports to firstReplicator
+  //         firstReplicator.ports = [firstReplicator.ports[0], ...auxPorts];
+  //         firstReplicator.levelDeltas = [...levelDeltas];
+
+  //         // Link external ports
+  //         firstReplicator.ports.forEach((p, i) => link(p, { node: firstReplicator, port: i }));
+
+  //         // Remove secondReplicator from graph
+  //         removeFromArrayIf(graph, (n) => n === secondReplicator);
+  //       });
+  //     }
+  //   }
+  // }
+
+  // // Check for commutations (fan-rep, rep-rep)
+  // const commutationsOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
+  // let commutations = false;
+  // for (const node of graph) {
+  //   if (node.ports[0].port === 0) {
+  //     // Active pair
+  //     if (
+  //       ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
+  //         node.ports[0].node.type === "app")))
+  //     ) {
+  //       // Fan-Rep commutation
+  //       commutations = true;
+  //       const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
+  //       const level = parseRepLabel(rep.label!).level;
+  //       createRedex(node, node.ports[0].node, commutationsOptimal && !(node as any).isToBeMerged, () => {
+  //         const { nodeClones } = reduceCommute(rep, graph);
+  //         nodeClones[0].label = formatRepLabel(level, "unknown");
+  //         nodeClones[1].label = formatRepLabel(relativeLevel ? level + 1 :level, "unknown");
+  //         nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
+  //       });
+  //     } else if (
+  //       node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
+  //     ) {
+  //       // Rep-Rep commutation
+  //       const a = node;
+  //       const b = node.ports[0].node;
+  //       commutations = true;
+  //       const { level: top, status: topFlag } = parseRepLabel(a.label!);
+  //       const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
+  //       if (top === bottom) {
+  //         createRedex(a, b, true, () => reduceAnnihilate(b, graph));
+  //       } else {
+  //         createRedex(a, b, commutationsOptimal && !(node as any).isToBeMerged, () => {
+  //           const { nodeClones, otherClones } = reduceCommute(b, graph);
+  //           if (top > bottom) {
+  //             // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
+  //             otherClones.forEach((node, i) => {
+  //               node.label = formatRepLabel(
+  //                 top + b.levelDeltas![i],
+  //                 topFlag,
+  //               );
+  //             });
+  //           } else {
+  //             // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
+  //             nodeClones.forEach((node, i) => {
+  //               node.label = formatRepLabel(
+  //                 bottom + a.levelDeltas![i],
+  //                 bottomFlag,
+  //               );
+  //             });
+  //           }
+  //         });
+  //       }
+  //     }
+  //   }
+  // }
+
+  // // Check for aux fan replication
+  // const auxFanReplicationOptimal = !commutations && commutationsOptimal;
+  // let auxFanReplications = false;
+  // for (const node of graph) {
+  //   if (
+  //     (node.type === "abs" || node.type === "app") &&
+  //     node.ports[1].node.type.startsWith("rep") &&
+  //     node.ports[1].port === 0
+  //   ) {
+  //     auxFanReplications = true;
+  //     createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph, relativeLevel));
+  //   }
+  // }
 
   return redexes;
 }
@@ -386,8 +449,11 @@ function render(
   const graph = currState.stack[currState.idx];
   const node2D = new Node2D();
 
-  // Reset isCreated flag
-  graph.forEach((node) => (node.isCreated = false));
+  // Reset flags
+  graph.forEach((node) => {
+    node.isCreated = false;
+    (node as any).keep = undefined;
+  });
 
   // Get redexes
   const redexes = getRedexes(graph, systemType, relativeLevel);
@@ -521,6 +587,56 @@ function render(
         });
       });
     };
+  } else if (!currState.data.appliedFinalStep) {
+    const finalStep = () => {
+      applyReduction(state, () => {
+        currState.data.appliedFinalStep = true;
+        console.log("applied final step");
+
+        // Traverse all nodes starting at the root and marking them as "keep" then erase non maked nodes
+        const traverse = (nodePort: NodePort) => {
+          console.log("traverse", nodePort.node.label);
+          const node = nodePort.node;
+          (node as any).keep = true;
+          // Only traverse child ports
+          if (node.type === "abs") {
+            traverse(node.ports[1]);
+          } else if (node.type === "app") {
+            traverse(node.ports[0]);
+            traverse(node.ports[2]);
+          } else if (node.type === "rep-in") {
+            traverse(node.ports[0]);
+          } else if (node.type === "rep-out") {
+            node.ports.forEach((p) => { if (p.port !== 0) traverse(p) });
+          } else if (node.type === "era") {
+            // nothing to do
+          }
+        }
+        (rootNode as any).keep = true;
+        traverse(rootNode.ports[0]);
+
+        // Erase non kept nodes
+        const graph = currState.stack[currState.idx];
+        graph.forEach((node) => {
+          if ((node as any).keep) {
+            // Loop through ports
+            node.ports.forEach((p, i) => {
+              if (!(p.node as any).keep) {
+                // Connect all ports to erasers (don't add eraser to graph)
+                const eraser: Node = { type: "era", label: "era", ports: [] };
+                link({ node, port: i }, { node: eraser, port: 0 });
+              }
+            });
+          }
+        });
+        removeFromArrayIf(graph, (n) => !(n as any).keep);
+      });
+    }
+    currState.forward = finalStep;
+    currState.forwardParallel = finalStep;
+  } else {
+    currState.forward = undefined;
+    currState.forwardParallel = undefined;
   }
 
   return node2D;
@@ -910,7 +1026,7 @@ const renderNodePort = (
 };
 
 // Renders wires between paired endpoints, and returns the remaining endpoints
-const renderWires = (node2D: Node2D, endpoints: Endpoint[], state: Signal<MethodState<any>>) => {
+const renderWires = (node2D: Node2D, endpoints: Endpoint[], state: Signal<MethodState<any, Data>>) => {
   // Sort endpoints by x position
   endpoints.sort((a, b) =>
     a.node2D.globalPosition().x - b.node2D.globalPosition().x
@@ -1337,7 +1453,7 @@ export type Node = {
 
 // Applies a reduction to the current state, and updates the navigation functions
 export function applyReduction(
-  state: Signal<MethodState<any>>,
+  state: Signal<MethodState<any, Data>>,
   reduce: () => void,
 ) {
   // Deep clone current state and insert it into the stack below the
@@ -1383,6 +1499,7 @@ export function applyReduction(
     }
     currState.forward = forward;
     currState.last = last;
+    currState.data.appliedFinalStep = false;
     // Trigger state update
     batch(() => {
       state.value = { ...currState };

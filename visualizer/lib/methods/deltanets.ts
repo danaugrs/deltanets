@@ -8,6 +8,7 @@ import {
   Node2D,
   Replicator,
   Root,
+  SUBOPTIMAL_HIGHLIGHT_COLOR,
   Wire,
 } from "../render.ts";
 import { removeFromArrayIf } from "../util.ts";
@@ -1253,9 +1254,6 @@ function addAstNodeToGraph(
     throw new Error("Unknown node type: " + (astNode as any).type);
   }
 }
-
-// Color for suboptimal rules
-const SUBOPTIMAL_HIGHLIGHT_COLOR = "#ff666645";
 
 // Colors for the levels
 const levelColors = [

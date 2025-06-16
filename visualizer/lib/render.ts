@@ -217,13 +217,11 @@ export function defaultFill(theme: "light" | "dark") {
   return theme === "light" ? "#FFF" : "#1A1A1A";
 }
 
-export function highlight(theme: "light" | "dark") {
-  return theme === "light" ? "#44e00040" : "#44e60045";
-}
+// Color for optimal rules
+export const OPTIMAL_HIGHLIGHT_COLOR = "#44e00040";
 
-export function highlight2(theme: "light" | "dark") {
-  return theme === "light" ? "#ffd00087" : "#ffe60020";
-}
+// Color for suboptimal rules
+export const SUBOPTIMAL_HIGHLIGHT_COLOR = "#ff666645";
 
 // Some text.
 export class Text extends Node2D {
@@ -459,7 +457,7 @@ export class Label extends Node2D {
   override renderSelf(pos: Pos, theme: "light" | "dark", debug?: boolean) {
     this.highlightRect.attrs = {
       ...this.highlightRect.attrs,
-      fill: highlight(theme),
+      fill: OPTIMAL_HIGHLIGHT_COLOR,
     };
   }
 }
@@ -572,7 +570,7 @@ export class Edge extends Node2D {
     if (this.onClick) {
       this.highlightPath.path = path;
       this.highlightPath.attrs = {
-        stroke: highlight(theme),
+        stroke: OPTIMAL_HIGHLIGHT_COLOR,
         "stroke-width": "36px",
         "stroke-linecap": "round",
       };
@@ -994,7 +992,7 @@ export class Wire extends Node2D {
     if (this.onClick) {
       this.highlightPath.path = path;
       this.highlightPath.attrs = {
-        stroke: this.highlightColor ?? highlight(theme),
+        stroke: this.highlightColor ?? OPTIMAL_HIGHLIGHT_COLOR,
         "stroke-width": "36px",
         "stroke-linecap": "round",
       };
@@ -1378,7 +1376,7 @@ export class Twine extends Node2D {
     if (this.onClick) {
       this.highlightRect.attrs = {
         stroke: "none",
-        fill: highlight(theme),
+        fill: OPTIMAL_HIGHLIGHT_COLOR,
       };
 
       const hX = this.highlightRect.globalPosition().x;

@@ -27,8 +27,7 @@ import IconBug from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/bug.tsx";
 import IconBugOff from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/bug-off.tsx";
 import IconTarget from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/target.tsx";
 import IconTargetOff from "https://deno.land/x/tabler_icons_tsx@0.0.7/tsx/target-off.tsx";
-import { cleanExpr, prettifyExpr } from "../lib/util.ts";
-import { highlight, Node2D, Pos, render } from "../lib/render.ts";
+import { Node2D, OPTIMAL_HIGHLIGHT_COLOR, Pos, render } from "../lib/render.ts";
 import { useEffect, useRef } from "preact/hooks";
 import loader, { type Monaco } from "@monaco-editor/loader";
 import examples from "../lib/examples.ts";
@@ -539,7 +538,7 @@ export default function App() {
         class={squareButtonClass}
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: isDeltaFinalStep ? highlight(theme.value) : "transparent"
+          background: isDeltaFinalStep ? OPTIMAL_HIGHLIGHT_COLOR : "transparent"
         }}
         onClick={METHODS[method.value].state.value?.forward}
         disabled={!METHODS[method.value].state.value?.forward}

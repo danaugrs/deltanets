@@ -10,7 +10,7 @@ import {
   SystemType,
 } from "../ast.ts";
 import * as d3 from "d3";
-import { Edge, Enclosure, Label, Node2D, Pos } from "../render.ts";
+import { Edge, Enclosure, Label, Node2D, OPTIMAL_HIGHLIGHT_COLOR, Pos, SUBOPTIMAL_HIGHLIGHT_COLOR } from "../render.ts";
 import { Method, MethodState } from "./index.ts";
 import { prettifyExpr } from "../util.ts";
 
@@ -140,6 +140,21 @@ function renderAstNode(
     // Update the label with the application symbol
     node2D.text.value = "@";
 
+
+    const funcAstNode = astNode.func;
+    const argAstNode = astNode.arg;
+    const isFuncAbs = funcAstNode.type === "abs";
+
+    let redexId = "0"
+    let isOptimal = true;
+    if (isFuncAbs) {
+      redexCount.rc += 1;
+      if (redexCount.rc > 1) {
+        isOptimal = false;
+      }
+      redexId = redexCount.rc.toString();
+    }
+
     // Render the function and the argument of the application
     const func = renderAstNode(
       state,
@@ -172,9 +187,6 @@ function renderAstNode(
     // Aggregate variables
     vars = [...func.vars, ...arg.vars];
 
-    const funcAstNode = astNode.func;
-    const argAstNode = astNode.arg;
-    const isFuncAbs = funcAstNode.type === "abs";
     const bVars = isFuncAbs
       ? boundVars(funcAstNode.body, funcAstNode.name)
       : [];
@@ -314,8 +326,6 @@ function renderAstNode(
     // Add the same class to the edge and all bound variables so we can
     // highlight the variables when hovering over the edge
     if (isFuncAbs) {
-      redexCount.rc += 1;
-      const redexId = redexCount.rc.toString();
       bVars.forEach(
         (
           b,
@@ -329,13 +339,16 @@ function renderAstNode(
           d3.select(this as any)
             .attr("stroke-width", "40px")
             .attr("cursor", "pointer");
-          d3.selectAll(".redex-var-" + redexId).attr("display", null);
+          d3.selectAll(".redex-var-" + redexId).attr("display", null).attr("fill", isOptimal ? OPTIMAL_HIGHLIGHT_COLOR : SUBOPTIMAL_HIGHLIGHT_COLOR);
         },
         mouseout: function () {
           d3.select(this as any).attr("stroke-width", "36px");
           d3.selectAll(".redex-var-" + redexId).attr("display", "none");
         },
       };
+      if (!isOptimal) {
+        edge.highlightPath.styles.stroke = SUBOPTIMAL_HIGHLIGHT_COLOR;
+      }
     }
 
     // Add left edge

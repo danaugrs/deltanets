@@ -460,6 +460,20 @@ export default function App() {
           </option>
         ))}
       </select>
+      {method.value === "deltanets" && <select
+        value={relativeLevel.value ? "relative" : "absolute"}
+        onChange={(e) => {
+          const newRelativeLevel = (e?.target as HTMLSelectElement).value === "relative";
+          relativeLevel.value = newRelativeLevel;
+        }}
+        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
+        style={{
+          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
+          background: theme.value === "light" ? "white" : "#1A1A1A",
+        }}>
+        <option value="absolute">Absolute levels (default)</option>
+        <option value="relative">Relative levels</option>
+      </select>}
       <select
         // This select is just an indicator in the lambda calculus method
         disabled={method.value === "lambdacalc"}
@@ -483,20 +497,6 @@ export default function App() {
         <option value="relevant" disabled={systemType.value === "affine" || systemType.value === "full"}>Relevant (I)</option>
         <option value="full">Full (K)</option>
       </select>
-      {method.value === "deltanets" && <select
-        value={relativeLevel.value ? "relative" : "absolute"}
-        onChange={(e) => {
-          const newRelativeLevel = (e?.target as HTMLSelectElement).value === "relative";
-          relativeLevel.value = newRelativeLevel;
-        }}
-        class="border-1 rounded px-1 text-xl min-h-[44px] bg-inherit"
-        style={{
-          borderColor: theme.value === "light" ? "#000D" : "#FFF6",
-          background: theme.value === "light" ? "white" : "#1A1A1A",
-        }}>
-        <option value="absolute">Absolute levels (default)</option>
-        <option value="relative">Relative levels</option>
-      </select>}
       <button
         type="button"
         title="Return to the beginning. Keyboard shortcut: Shift + left arrow key."

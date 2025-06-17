@@ -215,6 +215,72 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
             });
           }
         }
+      } else if (
+        node.type.startsWith("rep") &&
+        node.ports[0].node.type.startsWith("rep") &&
+        parseRepLabel(node.ports[0].node.label!).status === "unpaired"
+      ) {
+        const firstReplicator = node.ports[0].node;
+        const secondReplicator = node;
+        const secondReplicatorPort = secondReplicator.ports[0].port;
+
+        // Check if the second replicator is unpaired
+        let secondUnpaired =
+          parseRepLabel(secondReplicator.label!).status === "unpaired";
+        // Get the level delta between the two replicators
+        const levelDeltaBetween =
+          firstReplicator.levelDeltas![secondReplicatorPort - 1];
+        // Check for constraint that helps determine whether the second replicator is unpaired
+        if (!secondUnpaired) {
+          const { level: firstLevel } = parseRepLabel(firstReplicator.label!);
+          const { level: secondLevel } = parseRepLabel(secondReplicator.label!);
+          const diff = secondLevel - firstLevel;
+          if (0 <= diff && diff <= levelDeltaBetween) {
+            secondUnpaired = true;
+          }
+        }
+
+        if (secondUnpaired) {
+          (firstReplicator as any).isToBeMerged = true;
+          // Merge the two replicators
+          createRedex(firstReplicator, secondReplicator, false, () => {
+            // Reset isToBeMerged flag
+            (firstReplicator as any).isToBeMerged = false;
+
+            firstReplicator.ports.splice(secondReplicatorPort, 1, ...secondReplicator.ports.slice(1));
+            firstReplicator.levelDeltas!.splice(secondReplicatorPort - 1, 1, ...secondReplicator.levelDeltas!.map((ld) => ld + levelDeltaBetween));
+
+            // Reorder ports of firstReplicator according to level deltas
+
+            // Zip aux ports with level deltas
+            const portsWithLevelDeltas: { nodePort: NodePort; levelDelta: number }[] = firstReplicator.ports.slice(1).map((nodePort, i) => {
+              return { nodePort, levelDelta: firstReplicator.levelDeltas![i] };
+            });
+
+            // Sort by level delta
+            portsWithLevelDeltas.sort(({ levelDelta: levelDeltaA }, { levelDelta: levelDeltaB }) => {
+              return levelDeltaA - levelDeltaB;
+            });
+
+            // Unzip aux ports and level deltas
+            const auxPorts: NodePort[] = [];
+            const levelDeltas: number[] = [];
+            portsWithLevelDeltas.forEach(({ nodePort, levelDelta }) => {
+              auxPorts.push(nodePort);
+              levelDeltas.push(levelDelta);
+            });
+
+            // // Assign aux ports to firstReplicator
+            firstReplicator.ports = [firstReplicator.ports[0], ...auxPorts];
+            firstReplicator.levelDeltas = [...levelDeltas];
+
+            // Link external ports
+            firstReplicator.ports.forEach((p, i) => link(p, { node: firstReplicator, port: i }));
+
+            // Remove secondReplicator from graph
+            removeFromArrayIf(graph, (n) => n === secondReplicator);
+          });
+        }
       }
     }
   }
@@ -272,74 +338,7 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
   // let replicatorCanonicalizations = false;
   // for (const node of graph) {
   //   // Find pairs of consecutive replicators where the first one is unpaired
-  //   if (
-  //     node.type.startsWith("rep") &&
-  //     node.ports[0].node.type.startsWith("rep") &&
-  //     parseRepLabel(node.ports[0].node.label!).status === "unpaired"
-  //   ) {
-  //     const firstReplicator = node.ports[0].node;
-  //     const secondReplicator = node;
-  //     const secondReplicatorPort = secondReplicator.ports[0].port;
-
-  //     // Check if the second replicator is unpaired
-  //     let secondUnpaired =
-  //       parseRepLabel(secondReplicator.label!).status === "unpaired";
-  //     // Get the level delta between the two replicators
-  //     const levelDeltaBetween =
-  //       firstReplicator.levelDeltas![secondReplicatorPort - 1];
-  //     // Check for constraint that helps determine whether the second replicator is unpaired
-  //     if (!secondUnpaired) {
-  //       const { level: firstLevel } = parseRepLabel(firstReplicator.label!);
-  //       const { level: secondLevel } = parseRepLabel(secondReplicator.label!);
-  //       const diff = secondLevel - firstLevel;
-  //       if (0 <= diff && diff <= levelDeltaBetween) {
-  //         secondUnpaired = true;
-  //       }
-  //     }
-
-  //     if (secondUnpaired) {
-  //       replicatorCanonicalizations = true;
-  //       (firstReplicator as any).isToBeMerged = true;
-  //       // Merge the two replicators
-  //       createRedex(firstReplicator, secondReplicator, replicatorCanonicalizationOptimal, () => {
-  //         // Reset isToBeMerged flag
-  //         (firstReplicator as any).isToBeMerged = false;
-
-  //         firstReplicator.ports.splice(secondReplicatorPort, 1, ...secondReplicator.ports.slice(1));
-  //         firstReplicator.levelDeltas!.splice(secondReplicatorPort - 1, 1, ...secondReplicator.levelDeltas!.map((ld) => ld + levelDeltaBetween));
-
-  //         // Reorder ports of firstReplicator according to level deltas
-
-  //         // Zip aux ports with level deltas
-  //         const portsWithLevelDeltas: { nodePort: NodePort; levelDelta: number }[] = firstReplicator.ports.slice(1).map((nodePort, i) => {
-  //           return { nodePort, levelDelta: firstReplicator.levelDeltas![i] };
-  //         });
-
-  //         // Sort by level delta
-  //         portsWithLevelDeltas.sort(({ levelDelta: levelDeltaA }, { levelDelta: levelDeltaB }) => {
-  //           return levelDeltaA - levelDeltaB;
-  //         });
-
-  //         // Unzip aux ports and level deltas
-  //         const auxPorts: NodePort[] = [];
-  //         const levelDeltas: number[] = [];
-  //         portsWithLevelDeltas.forEach(({ nodePort, levelDelta }) => {
-  //           auxPorts.push(nodePort);
-  //           levelDeltas.push(levelDelta);
-  //         });
-
-  //         // // Assign aux ports to firstReplicator
-  //         firstReplicator.ports = [firstReplicator.ports[0], ...auxPorts];
-  //         firstReplicator.levelDeltas = [...levelDeltas];
-
-  //         // Link external ports
-  //         firstReplicator.ports.forEach((p, i) => link(p, { node: firstReplicator, port: i }));
-
-  //         // Remove secondReplicator from graph
-  //         removeFromArrayIf(graph, (n) => n === secondReplicator);
-  //       });
-  //     }
-  //   }
+  //
   // }
 
   // // Check for aux fan replication
@@ -534,6 +533,10 @@ function render(
       // console.log("traverse", nodePort.node.label);
       const node = nodePort.node;
       const port = nodePort.port;
+      if ((node as any).keep) {
+        // Avoid infinite loop
+        return;
+      }
       (node as any).keep = true;
       // Only traverse child ports
       if (node.type === "abs" && port === 0) {

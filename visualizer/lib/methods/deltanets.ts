@@ -150,7 +150,7 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     }
   }
 
-  // Relevant system
+  // Relevant/Full systems
   else /*if (systemType === "relevant" || systemType === "full") */ {
     for (const node of graph) {
       if (systemType === "relevant" && node.type === "era") {
@@ -283,6 +283,63 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
         }
       }
     }
+
+    // Traverse net and mark the leftmost-outermost redex as optimal
+    const rootNode = graph.find((node) => node.type === "root")!;
+    // Traverse all nodes starting at the root and mark the first redex found as optimal
+    const traverse = (nodePort: NodePort) => {
+      const node = nodePort.node;
+      const port = nodePort.port;
+      console.log("traverse", node.label, nodePort);
+      // If nodes form an active pair
+      if (nodePort.port === 0 && nodePort.node.ports[0].node.ports[0].node === nodePort.node) {
+        const redex = getRedex(nodePort.node, nodePort.node.ports[0].node, redexes);
+        if (redex) {
+          console.log("found redex", redex);
+          redex.optimal = true;
+          return true;
+        }
+      }
+
+      // TODO: merge replicators
+
+      if ((node as any).keep) {
+        // Avoid infinite loop
+        return false;
+      }
+      // Only traverse child ports
+      if (node.type === "abs" && port === 0) {
+        if (node.ports[2].node.type === "era") {
+          if (traverse(node.ports[2])) {
+            return true;
+          }
+        }
+        if (traverse(node.ports[1])) {
+          return true;
+        }
+      } else if (node.type === "app" && port === 1) {
+        if (traverse(node.ports[0])) {
+          return true;
+        }
+        if (traverse(node.ports[2])) {
+          return true;
+        }
+      } else if (node.type === "rep-in" && port !== 0) {
+        return traverse(node.ports[0]);
+      } else if (node.type === "rep-out" && port === 0) {
+        for (const p of node.ports) {
+          if (p.port !== 0) {
+            if (traverse(p)) {
+              return true;
+            }
+          }
+        }
+      } else if (node.type === "era") {
+        // nothing to do
+      }
+      return false;
+    }
+    traverse(rootNode.ports[0]);
   }
 
   // // Check for rep decay
@@ -331,14 +388,6 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
   //       });
   //     }
   //   }
-  // }
-
-  // // Check for unpaired replicator mergings and decays
-  // const replicatorCanonicalizationOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
-  // let replicatorCanonicalizations = false;
-  // for (const node of graph) {
-  //   // Find pairs of consecutive replicators where the first one is unpaired
-  //
   // }
 
   // // Check for aux fan replication

@@ -151,80 +151,73 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
   }
 
   // Relevant system
-  else if (systemType === "relevant") {
-    // There are only app-abs annihilation pairs and they are always optimal
+  else /*if (systemType === "relevant" || systemType === "full") */ {
     for (const node of graph) {
+      if (systemType === "relevant" && node.type === "era") {
+        console.error("Error: eraser in relevant system", node);
+      }
       if (node.ports[0].port === 0) {
         // Skip pairs with variables or with the root node
         if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
           continue
         }
-        createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
+        if (node.type === "era") {
+          createRedex(node, node.ports[0].node, false, () => reduceErase(node.ports[0].node, graph));
+        } else if (node.ports[0].node.type === "era") {
+          createRedex(node, node.ports[0].node, false, () => reduceErase(node, graph));
+        } else if (
+          node.type === "abs" && node.ports[0].node.type === "app"
+        ) {
+          createRedex(node, node.ports[0].node, false, () => reduceAnnihilate(node, graph));
+        } else if (
+          ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
+            node.ports[0].node.type === "app")))
+        ) {
+          // Fan-Rep commutation
+          const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
+          const level = parseRepLabel(rep.label!).level;
+          createRedex(node, node.ports[0].node, false, () => {
+            const { nodeClones } = reduceCommute(rep, graph);
+            nodeClones[0].label = formatRepLabel(level, "unknown");
+            nodeClones[1].label = formatRepLabel(relativeLevel ? level + 1 :level, "unknown");
+            nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";
+          });
+        } else if (
+          node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
+        ) {
+          // Rep-Rep commutation
+          const a = node;
+          const b = node.ports[0].node;
+          const { level: top, status: topFlag } = parseRepLabel(a.label!);
+          const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
+          if (top === bottom) {
+            createRedex(a, b, false, () => reduceAnnihilate(b, graph));
+          } else {
+            createRedex(a, b, false, () => {
+              const { nodeClones, otherClones } = reduceCommute(b, graph);
+              if (top > bottom) {
+                // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
+                otherClones.forEach((node, i) => {
+                  node.label = formatRepLabel(
+                    top + b.levelDeltas![i],
+                    topFlag,
+                  );
+                });
+              } else {
+                // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
+                nodeClones.forEach((node, i) => {
+                  node.label = formatRepLabel(
+                    bottom + a.levelDeltas![i],
+                    bottomFlag,
+                  );
+                });
+              }
+            });
+          }
+        }
       }
     }
   }
-
-  // Full system
-  else if (systemType === "full") {
-    // Check for eraser active pairs (era-era, era-fan, era-rep, era-FV)
-  }
-
-  // Otherwise, error
-  else {
-    console.error("Error: unknown system type", systemType);
-  }
-
-  // // Check for eraser active pairs (era-era, era-fan, era-rep, era-FV)
-  // let eraserActivePairs = false;
-  // for (const node of graph) {
-  //   if (node.ports[0].node.type === "era") {
-  //     if (node.type !== "era") {
-  //       // Only set eraserActivePairs to true if the eraser is not connected to another eraser, since era-era is an annihilation which can be applied at any time
-  //       eraserActivePairs = true;
-  //     }
-  //     createRedex(node, node.ports[0].node, true, () => reduceErase(node, graph));
-  //   }
-  // }
-
-  // // Check for fan-fan pairs
-  // let fanFanAnnihilations = false;
-  // for (const node of graph) {
-  //   if (
-  //     (node.type === "abs" && node.ports[0].node.type === "app" &&
-  //       node.ports[0].port === 0)
-  //   ) {
-  //     fanFanAnnihilations = true;
-  //     createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
-  //   }
-  // }
-
-  // // Check for rep-rep annihilation pairs
-  // let repRepAnnihilations = false;
-  // for (const node of graph) {
-  //   if (
-  //     node.type.startsWith("rep") &&
-  //     node.ports[0].node.type.startsWith("rep") &&
-  //     node.ports[0].port === 0 &&
-  //     parseRepLabel(node.label!).level ===
-  //       parseRepLabel(node.ports[0].node.label!).level
-  //   ) {
-  //     repRepAnnihilations = true;
-  //     createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
-  //   }
-  // }
-
-  // // Check for fan decay
-  // let fanDecays = false;
-  // for (const node of graph) {
-  //   if (
-  //     (node.type === "abs" ||
-  //       node.type === "app") &&
-  //     node.ports[1].node.type === "era"
-  //   ) {
-  //     fanDecays = true;
-  //     createRedex(node, node.ports[1].node, !fanFanAnnihilations, () => reduceAuxFan(node, graph));
-  //   }
-  // }
 
   // // Check for rep decay
   // let repDecays = false;
@@ -345,63 +338,6 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
   //         // Remove secondReplicator from graph
   //         removeFromArrayIf(graph, (n) => n === secondReplicator);
   //       });
-  //     }
-  //   }
-  // }
-
-  // // Check for commutations (fan-rep, rep-rep)
-  // const commutationsOptimal = !fanDecays && !repDecays && !eraserActivePairs && !fanFanAnnihilations && !repRepAnnihilations;
-  // let commutations = false;
-  // for (const node of graph) {
-  //   if (node.ports[0].port === 0) {
-  //     // Active pair
-  //     if (
-  //       ((node.type.startsWith("rep") && (node.ports[0].node.type === "abs" ||
-  //         node.ports[0].node.type === "app")))
-  //     ) {
-  //       // Fan-Rep commutation
-  //       commutations = true;
-  //       const rep = node.type.startsWith("rep") ? node : node.ports[0].node;
-  //       const level = parseRepLabel(rep.label!).level;
-  //       createRedex(node, node.ports[0].node, commutationsOptimal && !(node as any).isToBeMerged, () => {
-  //         const { nodeClones } = reduceCommute(rep, graph);
-  //         nodeClones[0].label = formatRepLabel(level, "unknown");
-  //         nodeClones[1].label = formatRepLabel(relativeLevel ? level + 1 :level, "unknown");
-  //         nodeClones[1].type = nodeClones[1].type === "rep-in" ? "rep-out" : "rep-in";;
-  //       });
-  //     } else if (
-  //       node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")
-  //     ) {
-  //       // Rep-Rep commutation
-  //       const a = node;
-  //       const b = node.ports[0].node;
-  //       commutations = true;
-  //       const { level: top, status: topFlag } = parseRepLabel(a.label!);
-  //       const { level: bottom, status: bottomFlag } = parseRepLabel(b.label!);
-  //       if (top === bottom) {
-  //         createRedex(a, b, true, () => reduceAnnihilate(b, graph));
-  //       } else {
-  //         createRedex(a, b, commutationsOptimal && !(node as any).isToBeMerged, () => {
-  //           const { nodeClones, otherClones } = reduceCommute(b, graph);
-  //           if (top > bottom) {
-  //             // Need to update the levels of the top replicator copies (otherClones) according to the level deltas of the bottom replicator
-  //             otherClones.forEach((node, i) => {
-  //               node.label = formatRepLabel(
-  //                 top + b.levelDeltas![i],
-  //                 topFlag,
-  //               );
-  //             });
-  //           } else {
-  //             // Need to update the levels of the bottom replicator copies (nodeClones) according to the level deltas of the top replicator
-  //             nodeClones.forEach((node, i) => {
-  //               node.label = formatRepLabel(
-  //                 bottom + a.levelDeltas![i],
-  //                 bottomFlag,
-  //               );
-  //             });
-  //           }
-  //         });
-  //       }
   //     }
   //   }
   // }

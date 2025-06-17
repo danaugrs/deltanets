@@ -300,7 +300,14 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
         }
       }
 
-      // TODO: merge replicators
+      // Check for rep merges
+      if (node.type.startsWith("rep") && node.ports[0].node.type.startsWith("rep")) {
+        const redex = getRedex(node, node.ports[0].node, redexes);
+        if (redex) {
+          redex.optimal = true;
+          return true;
+        }
+      }
 
       if ((node as any).traversed) {
         // Avoid infinite loop

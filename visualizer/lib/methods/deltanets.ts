@@ -290,12 +290,11 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     const traverse = (nodePort: NodePort) => {
       const node = nodePort.node;
       const port = nodePort.port;
-      console.log("traverse", node.label, nodePort);
+
       // If nodes form an active pair
       if (nodePort.port === 0 && nodePort.node.ports[0].node.ports[0].node === nodePort.node) {
         const redex = getRedex(nodePort.node, nodePort.node.ports[0].node, redexes);
         if (redex) {
-          console.log("found redex", redex);
           redex.optimal = true;
           return true;
         }
@@ -303,10 +302,11 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
 
       // TODO: merge replicators
 
-      if ((node as any).keep) {
+      if ((node as any).traversed) {
         // Avoid infinite loop
         return false;
       }
+      (node as any).traversed = true;
       // Only traverse child ports
       if (node.type === "abs" && port === 0) {
         if (node.ports[2].node.type === "era") {
@@ -327,11 +327,9 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
       } else if (node.type === "rep-in" && port !== 0) {
         return traverse(node.ports[0]);
       } else if (node.type === "rep-out" && port === 0) {
-        for (const p of node.ports) {
-          if (p.port !== 0) {
-            if (traverse(p)) {
-              return true;
-            }
+        for (let i = 1; i < node.ports.length; i++) {
+          if (traverse(node.ports[i])) {
+            return true;
           }
         }
       } else if (node.type === "era") {
@@ -442,6 +440,7 @@ function render(
   graph.forEach((node) => {
     node.isCreated = false;
     (node as any).keep = undefined;
+    (node as any).traversed = undefined;
   });
 
   // Get redexes
@@ -596,10 +595,12 @@ function render(
       } else if (node.type === "app" && port === 1) {
         traverse(node.ports[0]);
         traverse(node.ports[2]);
-      } else if (node.type === "rep-in" && port !== 0) {
+      } else if (node.type.startsWith("rep") && port !== 0) {
         traverse(node.ports[0]);
-      } else if (node.type === "rep-out" && port === 0) {
-        node.ports.forEach((p) => { if (p.port !== 0) traverse(p) });
+      } else if (node.type.startsWith("rep") && port === 0) {
+        for (let i = 1; i < node.ports.length; i++) {
+          traverse(node.ports[i]);
+        }
       } else if (node.type === "era") {
         // nothing to do
       }

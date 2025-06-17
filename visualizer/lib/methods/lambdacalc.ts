@@ -45,7 +45,7 @@ function render(
   relativeLevel: boolean,
 ): Node2D {
   const currState = state.peek()!;
-  const tree = renderAstNode(state, expression, currState.stack[currState.idx]);
+  const tree = renderAstNode(state, expression, currState.stack[currState.idx], { x: 0, y: 0 }, { rc: 0 }, systemType);
 
   // If forward is undefined, set it to reduce the next redex in normal-order
   if (currState.forward === undefined && tree.redexes.length > 0) {
@@ -65,6 +65,7 @@ function renderAstNode(
   pos: Pos = { x: 0, y: 0 },
   // RedexCount is used internally to assign a unique class to each redex so we can highlight them.
   redexCount = { rc: 0 },
+  systemType: SystemType,
 ): {
   node2D: Label;
   vars: Label[];
@@ -95,6 +96,7 @@ function renderAstNode(
       astNode.body,
       { x: 0, y: DY },
       redexCount,
+      systemType
     );
     node2D.add(body.node2D);
 
@@ -140,7 +142,6 @@ function renderAstNode(
     // Update the label with the application symbol
     node2D.text.value = "@";
 
-
     const funcAstNode = astNode.func;
     const argAstNode = astNode.arg;
     const isFuncAbs = funcAstNode.type === "abs";
@@ -149,7 +150,8 @@ function renderAstNode(
     let isOptimal = true;
     if (isFuncAbs) {
       redexCount.rc += 1;
-      if (redexCount.rc > 1) {
+      // In linear and affine systems all redexes are optimal
+      if ((systemType == "relevant" || systemType === "full") && redexCount.rc > 1) {
         isOptimal = false;
       }
       redexId = redexCount.rc.toString();
@@ -162,6 +164,7 @@ function renderAstNode(
       astNode.func,
       { x: 0, y: DY },
       redexCount,
+      systemType
     );
     const arg = renderAstNode(
       state,
@@ -169,6 +172,7 @@ function renderAstNode(
       astNode.arg,
       { x: 0, y: DY },
       redexCount,
+      systemType
     );
 
     const spread = (func.node2D.bounds.max.x - arg.node2D.bounds.min.x) / 2;

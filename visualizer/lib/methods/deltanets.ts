@@ -115,6 +115,12 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     // There are only app-abs annihilation pairs and they are always optimal
     for (const node of graph) {
       if (node.ports[0].port === 0) {
+        if (node.type === "era") {
+          console.error("Error: eraser in linear system", node);
+        }
+        if (node.type.startsWith("rep")) {
+          console.error("Error: rep in linear system", node);
+        }
         // Skip pairs with variables or with the root node
         if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
           continue
@@ -128,30 +134,8 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     }
   }
 
-  // Affine system
-  else if (systemType === "affine") {
-    for (const node of graph) {
-      if (node.type.startsWith("rep")) {
-        console.error("Error: rep in affine system", node);
-      }
-      if (node.ports[0].port === 0) {
-        // Skip pairs with variables or with the root node
-        if (node.type === "var" || node.ports[0].node.type === "var" || node.type === "root" || node.ports[0].node.type === "root") {
-          continue
-        }
-        if (node.type === "era") {
-          createRedex(node, node.ports[0].node, true, () => reduceErase(node.ports[0].node, graph));
-        } else if (node.ports[0].node.type === "era") {
-          createRedex(node, node.ports[0].node, true, () => reduceErase(node, graph));
-        } else {
-          createRedex(node, node.ports[0].node, true, () => reduceAnnihilate(node, graph));
-        }
-      }
-    }
-  }
-
-  // Relevant/Full systems
-  else /*if (systemType === "relevant" || systemType === "full") */ {
+  // Affine/Relevant/Full systems
+  else /*if (systemType === "affine" || systemType === "relevant" || systemType === "full") */ {
     for (const node of graph) {
       if (systemType === "relevant" && node.type === "era") {
         console.error("Error: eraser in relevant system", node);
@@ -1521,6 +1505,8 @@ export function applyReduction(
     currState.reset = undefined;
     currState.forward = forward;
     currState.last = last;
+    currState.data.appliedFinalStep = false;
+    currState.data.isFinalStep = false;
     // Trigger state update
     batch(() => {
       state.value = { ...currState };

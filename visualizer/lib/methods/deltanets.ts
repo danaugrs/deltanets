@@ -265,12 +265,19 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
             removeFromArrayIf(graph, (n) => n === secondReplicator);
           });
         }
+      } else if (
+        (node.type === "abs" || node.type === "app") &&
+        node.ports[1].node.type.startsWith("rep") &&
+        node.ports[1].port === 0
+      ) {
+        createRedex(node, node.ports[1].node, false, () => reduceAuxFan(node, graph, relativeLevel));
       }
     }
 
     // Traverse net and mark the leftmost-outermost redex as optimal
     const rootNode = graph.find((node) => node.type === "root")!;
     // Traverse all nodes starting at the root and mark the first redex found as optimal
+    let firstAuxFanReplication: Redex | undefined = undefined;
     const traverse = (nodePort: NodePort) => {
       const node = nodePort.node;
       const port = nodePort.port;
@@ -291,6 +298,11 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
           redex.optimal = true;
           return true;
         }
+      }
+
+      // Check for aux fan replication
+      if (firstAuxFanReplication === undefined && node.type.startsWith("rep") && node.ports[0].node.type === "app") {
+        firstAuxFanReplication = getRedex(node, node.ports[0].node, redexes);
       }
 
       if ((node as any).traversed) {
@@ -328,69 +340,17 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
       }
       return false;
     }
-    traverse(rootNode.ports[0]);
+    const res = traverse(rootNode.ports[0]);
+    if (res === false && firstAuxFanReplication !== undefined) {
+      firstAuxFanReplication.optimal = true;
+    };
   }
-
-  // // Check for rep decay
-  // let repDecays = false;
-  // for (const node of graph) {
-  //   if (node.type.startsWith("rep")) {
-  //     // If the replicator is unpaired and has some aux erasers or if all aux ports
-  //     // are connected to erasers we can create one redex for each aux eraser
-  //     if (
-  //       ((parseRepLabel(node.label!).status === "unpaired") &&
-  //         isConnectedToSomeErasers(node)) || isConnectedToAllErasers(node)
-  //     ) {
-  //       repDecays = true;
-  //       node.ports.forEach((p, i) => {
-  //         // Only consider aux ports connected to erasers
-  //         if (p.node.type !== "era" || i === 0) {
-  //           return;
-  //         }
-  //         // Create a redex to eliminate the replicator aux port and eraser (and replicator if it only has one aux port)
-  //         createRedex(node, p.node, !repRepAnnihilations || node.ports[0].port !== 0 || node.ports[0].node.type === "var", () => {
-  //           // Get the index of the aux port to remove
-  //           const portIndex = node.ports.indexOf(p);
-
-  //           // Update the port of the nodes connected to higher index aux ports
-  //           node.ports.forEach((np, pi) => {
-  //             if (pi > portIndex) {
-  //               np.node.ports[np.port].port = pi - 1;
-  //             }
-  //           });
-
-  //           // Remove the aux port and level delta
-  //           removeFromArrayIf(node.ports, (np, pi) => pi === portIndex);
-  //           removeFromArrayIf(node.levelDeltas!, (ld, ldi) => ldi === portIndex - 1);
-
-  //           // If this was the only aux port
-  //           if (node.ports.length === 1) {
-  //             // Connect the eraser to what is connected to the replicator's principal port
-  //             link(node.ports[0], p);
-  //             // Remove the replicator
-  //             removeFromArrayIf(graph, (n) => n === node);
-  //           } else {
-  //             // Remove the eraser
-  //             removeFromArrayIf(graph, (n) => n === p.node);
-  //           }
-  //         });
-  //       });
-  //     }
-  //   }
-  // }
 
   // // Check for aux fan replication
   // const auxFanReplicationOptimal = !commutations && commutationsOptimal;
   // let auxFanReplications = false;
   // for (const node of graph) {
-  //   if (
-  //     (node.type === "abs" || node.type === "app") &&
-  //     node.ports[1].node.type.startsWith("rep") &&
-  //     node.ports[1].port === 0
-  //   ) {
-  //     auxFanReplications = true;
-  //     createRedex(node, node.ports[1].node, auxFanReplicationOptimal && !(node.ports[1].node as any).isToBeMerged, () => reduceAuxFan(node, graph, relativeLevel));
-  //   }
+
   // }
 
   return redexes;

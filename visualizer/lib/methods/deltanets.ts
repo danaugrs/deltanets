@@ -636,17 +636,30 @@ function render(
               }
               (p as any).erase = true; // Mark port to erase
             })
-            
             // Remove level deltas and ports
             removeFromArrayIf(node.levelDeltas!, (ld, i) => (node.ports[i+1] as any).erase === true)
             removeFromArrayIf(node.ports, (p) => (p as any).erase === true)
-
             // Relink node ports
             node.ports.forEach((p, i) => {
               link(p, { node, port: i })
             })
-
           })
+
+          // Remove replicators with a single aux port that has a zero level delta
+          const nodesToRemove: Node[] = [];
+          graph.forEach((node) => {
+            if (node.type.startsWith("rep") &&
+                (node.ports.length === 2 &&
+                  node.levelDeltas![0] === 0)
+            ) {
+              link(node.ports[0], node.ports[1]);
+              nodesToRemove.push(node);
+            }
+          });
+          for (const node of nodesToRemove) {
+            removeFromArrayIf(graph, (n) => n === node);
+          }
+
         });
       }
       currState.forward = finalStep;

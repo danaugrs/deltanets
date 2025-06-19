@@ -613,7 +613,7 @@ function render(
               // Loop through ports
               node.ports.forEach((p, i) => {
                 if (!(p.node as any).keep) {
-                  // Connect all ports to erasers (don't add eraser to graph)
+                  // Connect the external port to a new eraser (don't add eraser to graph)
                   const eraser: Node = { type: "era", label: "era", ports: [] };
                   link({ node, port: i }, { node: eraser, port: 0 });
                 }
@@ -621,6 +621,32 @@ function render(
             }
           });
           removeFromArrayIf(graph, (n) => !(n as any).keep);
+
+          // Remove erasers connected to replicator aux ports (all replicators are unpaired at this point)
+          graph.forEach((node) => {
+            // Skip non replicators
+            if (!node.type.startsWith("rep")) {
+              return;
+            }
+            // Loop through replicator ports marking ports to erase
+            node.ports.forEach((p, i) => {
+              // Only consider aux ports connected to erasers
+              if (p.node.type !== "era" || i === 0) {
+                return;
+              }
+              (p as any).erase = true; // Mark port to erase
+            })
+            
+            // Remove level deltas and ports
+            removeFromArrayIf(node.levelDeltas!, (ld, i) => (node.ports[i+1] as any).erase === true)
+            removeFromArrayIf(node.ports, (p) => (p as any).erase === true)
+
+            // Relink node ports
+            node.ports.forEach((p, i) => {
+              link(p, { node, port: i })
+            })
+
+          })
         });
       }
       currState.forward = finalStep;

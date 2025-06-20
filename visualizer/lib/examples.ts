@@ -28,6 +28,15 @@ And T F`,
 (λx.(λy.((λf.((λh.(h (λp.(h (λq.q))))) (λl.(((f (λn.(l n))) x) y)))) (λg.(λu.(λv.((g u) (g v))))))))`,
   },
   {
+    name: "List Head",
+    code: `# List Head
+Cons = λa.λb.λf.f a b
+Head = λx.x λa.λb.a
+Tail = λx.x λa.λb.b
+
+Head (Cons one (Cons two three))`,
+  },
+  {
     name: "Ω (Non-Normalizing)",
     code: `# Ω (Non-Normalizing)
 (λa.a a) (λb.b b)`,

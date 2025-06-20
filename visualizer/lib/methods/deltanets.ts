@@ -266,11 +266,10 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
           });
         }
       } else if (
-        (node.type === "abs" || node.type === "app") &&
-        node.ports[1].node.type.startsWith("rep") &&
-        node.ports[1].port === 0
+        node.type.startsWith("rep") &&
+        node.ports[0].node.type === "app" && node.ports[0].port === 1
       ) {
-        createRedex(node, node.ports[1].node, false, () => reduceAuxFan(node, graph, relativeLevel));
+        createRedex(node, node.ports[0].node, false, () => reduceAuxFan(node.ports[0].node, graph, relativeLevel));
       }
     }
 
@@ -301,7 +300,7 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
       }
 
       // Check for aux fan replication
-      if (firstAuxFanReplication === undefined && node.type.startsWith("rep") && node.ports[0].node.type === "app") {
+      if (firstAuxFanReplication === undefined && node.type.startsWith("rep") && node.ports[0].node.type === "app" && node.ports[0].port === 1) {
         firstAuxFanReplication = getRedex(node, node.ports[0].node, redexes);
       }
 

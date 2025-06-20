@@ -345,13 +345,6 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     };
   }
 
-  // // Check for aux fan replication
-  // const auxFanReplicationOptimal = !commutations && commutationsOptimal;
-  // let auxFanReplications = false;
-  // for (const node of graph) {
-
-  // }
-
   return redexes;
 }
 

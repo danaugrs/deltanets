@@ -534,7 +534,7 @@ export default function App() {
       </div>
       <button
         type="button"
-        title="Step forward in history or, if no history available, apply a new reduction if possible. In the λ-calculus method, redexes are applied in normal order. Keyboard shortcut: right arrow key."
+        title="Step forward in history or, if no history available, apply a new reduction in normal order (leftmost-outermost)if possible. Keyboard shortcut: right arrow key."
         class={squareButtonClass}
         style={{
           borderColor: theme.value === "light" ? "#000D" : "#FFF6",

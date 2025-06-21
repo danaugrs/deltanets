@@ -343,6 +343,51 @@ function getRedexes(graph: Graph, systemType: SystemType, relativeLevel: boolean
     if (res === false && firstAuxFanReplication !== undefined) {
       firstAuxFanReplication.optimal = true;
     };
+
+    // Move the optimal redex (if any) to the beginning of the redexes array
+    // so that it is reduced when pressing right arrow key
+    redexes.sort((a, b) => a.optimal ? -1 : b.optimal ? 1 : 0);
+
+    // Mark certain redexes in the spine as optimal as well
+    const traverse2 = (nodePort: NodePort) => {
+      const node = nodePort.node;
+      const port = nodePort.port;
+      const other = nodePort.node.ports[0].node;
+
+      // If annihilation or commutation with only unknown replicators
+      if (port === 0 && other.ports[0].node === node && (!node.type.startsWith("rep") || parseRepLabel(node.label!).status === "unknown") && (!other.type.startsWith("rep") || parseRepLabel(other.label!).status === "unknown")) {
+        const redex = getRedex(nodePort.node, other, redexes);
+        if (redex) {
+          redex.optimal = true;
+        }
+      }
+
+      if ((node as any).traversed2) {
+        // Avoid infinite loop
+        return;
+      }
+      (node as any).traversed2 = true;
+      // Only traverse child ports
+      if (node.type === "abs" && port === 0) {
+        if (node.ports[2].node.type === "era") {
+          traverse2(node.ports[2]);
+        }
+        traverse2(node.ports[1]);
+      } else if (node.type === "app" && port === 1) {
+        traverse2(node.ports[0]);
+        // quit traversal since we only consider redexes on the spine
+        return;
+      } else if (node.type === "rep-in" && port !== 0) {
+        traverse2(node.ports[0]);
+      } else if (node.type === "rep-out" && port === 0) {
+        // quit traversal since we would need to traverse a specific port (so we would need to keep track of prior fan-ins)
+        return;
+      } else if (node.type === "era") {
+        // nothing to do
+      }
+      return;
+    }
+    traverse2(rootNode.ports[0]);
   }
 
   return redexes;
@@ -384,6 +429,7 @@ function render(
     node.isCreated = false;
     (node as any).keep = undefined;
     (node as any).traversed = undefined;
+    (node as any).traversed2 = undefined;
   });
 
   // Get redexes

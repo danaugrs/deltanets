@@ -74,11 +74,11 @@ export default function App() {
 
   // Whether to automatically center the graph
   const storedCenter = IS_BROWSER && window.localStorage.getItem("center");
-  const center = useSignal<boolean>(storedCenter === "true");
+  const center = useSignal<boolean>(storedCenter !== null ? storedCenter === "true" : true);
 
   // Whether to render debugging helpers
   const storedDebug = IS_BROWSER && window.localStorage.getItem("debug");
-  const debug = useSignal<boolean>(storedDebug === "true");
+  const debug = useSignal<boolean>(storedDebug !== null ? storedDebug === "true" : false);
 
   // Graph translation and scale
   const translate = useSignal<Pos>({ x: 0, y: 0 });
